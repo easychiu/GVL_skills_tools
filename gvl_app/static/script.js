@@ -470,7 +470,7 @@ function buildCharacterSlotPlan(equipmentByPosition) {
 
     Object.entries(equipmentByPosition).forEach(([position, equipmentNames]) => {
         const copyCount = duplicatePositions.has(position) ? 2 : 1;
-        for (let i = 1; i <= copyCount; i += 1) {
+        for (let i = 1; i <= copyCount; i++) {
             const slotName = copyCount === 2 ? `${position}${i}` : position;
             slots.push({
                 position,
@@ -484,10 +484,10 @@ function buildCharacterSlotPlan(equipmentByPosition) {
     return slots.sort((a, b) => {
         const aIndex = order.indexOf(a.label);
         const bIndex = order.indexOf(b.label);
-        const sortIndexA = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
-        const sortIndexB = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
-        if (sortIndexA !== sortIndexB) {
-            return sortIndexA - sortIndexB;
+        const indexA = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
+        const indexB = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
+        if (indexA !== indexB) {
+            return indexA - indexB;
         }
         return a.label.localeCompare(b.label, 'zh-Hant');
     });
