@@ -400,12 +400,13 @@ class GVLDataHandler:
         """根據優先技能搜尋最佳 Top-N 配裝方案。
 
         算法：每個槽位保留 candidates_per_slot 件高分候選，枚舉所有組合後
-        依 (優先技能1總值, 優先技能2總值, 優先技能3總值, 全技能加成總和) 排序，
+        依優先技能順序評分（最多 5 個），各技能數值越高且越接近 25 越優先，
+        同分時以整體加成總和作為次要排序，
         去重後回傳前 top_n 套。
 
         Args:
             profession: 職業名稱
-            priority_skills: 優先技能清單（最多 3 個，可含空字串）
+            priority_skills: 優先技能清單（最多 5 個，可含空字串）
             is_sailor: 是否套用航海士 +1
             top_n: 回傳方案數量
             candidates_per_slot: 每個槽位保留的候選裝備數（影響計算速度與品質）
@@ -415,7 +416,7 @@ class GVLDataHandler:
         Returns:
             方案列表，每筆包含：
               - equipment_names: 裝備名稱清單
-              - score_key: 排序用分數 tuple (p1, p2, p3, total_bonus)
+              - score_key: 排序用分數 tuple (p1..pN, priority_total, total_bonus)
               - priority_values: {技能名: 合計值} 字典
               - skill_result: 完整技能計算結果（同 calculate_character_skills 輸出）
 
@@ -427,8 +428,14 @@ class GVLDataHandler:
         if profession not in self.professions:
             raise ValueError(f'不支持的職業: {profession}')
 
-        # 只保留有效技能
-        p_skills = [s for s in priority_skills if s and s in self.skills]
+        # 只保留有效且不重複技能（最多 5 個，保留輸入順序）
+        p_skills: List[str] = []
+        for skill in priority_skills:
+            if not skill or skill not in self.skills or skill in p_skills:
+                continue
+            p_skills.append(skill)
+            if len(p_skills) >= 5:
+                break
 
         # 槽位配置常數（與 CharacterTab 保持一致）
         _DUPLICATE = {'飾品', '寶物'}
@@ -455,7 +462,7 @@ class GVLDataHandler:
         slots.sort(key=lambda s: order_map.get(s['label'], 999))
 
         def _score(eq: dict) -> tuple:
-            """裝備優先技能評分 tuple：(p1, p2, p3, total_bonus)"""
+            """裝備優先技能評分 tuple：(p1..pN, total_bonus)"""
             sk = eq.get('skills', {})
             pvals = tuple(sk.get(s, 0) for s in p_skills)
             return pvals + (sum(sk.values()),)
@@ -470,46 +477,29 @@ class GVLDataHandler:
             scored = sorted(eq_list, key=_score, reverse=True)
             slot_candidates.append(scored[:candidates_per_slot])
 
-        # 預先計算每件裝備的技能合計（避免在組合枚舉中重複 sum）
-        eq_total_cache: Dict[int, int] = {}
-        for cands in slot_candidates:
-            for eq in cands:
-                if eq is not None:
-                    eid = id(eq)
-                    if eid not in eq_total_cache:
-                        eq_total_cache[eid] = sum(eq.get('skills', {}).values())
-
-        # 枚舉所有組合並計算分數
-        scored_combos: List[tuple] = []
+        # 枚舉所有組合（先做唯一裝備與集合去重）
+        unique_combos: List[List[str]] = []
+        seen_combo_sig: set = set()
         for combo in iterproduct(*slot_candidates):
-            pvals = [0] * len(p_skills)
-            total_bonus = 0
             eq_names: List[str] = []
             for eq in combo:
                 if eq is None:
                     continue
-                sk = eq.get('skills', {})
-                for i, ps in enumerate(p_skills):
-                    pvals[i] += sk.get(ps, 0)
-                total_bonus += eq_total_cache[id(eq)]
                 eq_names.append(eq['name'])
             # 名稱含「(唯一)」的裝備不可重複裝備
             unique_names = [n for n in eq_names if '(唯一)' in n]
             if len(unique_names) != len(set(unique_names)):
                 continue
-            score_key = tuple(pvals) + (total_bonus,)
-            scored_combos.append((score_key, eq_names))
-
-        # 降序排列，去重（排列不同但裝備集合相同視為同一套），取前 top_n
-        scored_combos.sort(key=lambda x: x[0], reverse=True)
-
-        seen: set = set()
-        results: List[Dict[str, Any]] = []
-        for score_key, eq_names in scored_combos:
             sig = tuple(sorted(eq_names))
-            if sig in seen:
+            if sig in seen_combo_sig:
                 continue
-            seen.add(sig)
+            seen_combo_sig.add(sig)
+            unique_combos.append(eq_names)
+
+        # 依最終結果評分：優先技能越高且越接近 25 越前，同分看總加成
+        priority_target = 25
+        results: List[Dict[str, Any]] = []
+        for eq_names in unique_combos:
             try:
                 skill_result = self.calculate_character_skills(
                     profession, eq_names, is_sailor=is_sailor
@@ -521,14 +511,23 @@ class GVLDataHandler:
                 v > skill_cap for v in skill_result.get('bonus_skills', {}).values()
             ):
                 continue
-            priority_values = {p_skills[i]: score_key[i] for i in range(len(p_skills))}
+            bonus_skills = skill_result.get('bonus_skills', {})
+            priority_values = {skill: bonus_skills.get(skill, 0) for skill in p_skills}
+
+            # 各優先技能以 25 為上限評分（25 視為理想值）
+            priority_score = tuple(
+                min(max(priority_values.get(skill, 0), 0), priority_target)
+                for skill in p_skills
+            )
+            total_bonus = sum(skill_result.get('bonus_skills', {}).values())
+            score_key = priority_score + (sum(priority_score), total_bonus)
+
             results.append({
                 'equipment_names': eq_names,
                 'score_key': score_key,
                 'priority_values': priority_values,
                 'skill_result': skill_result,
             })
-            if len(results) >= top_n:
-                break
 
-        return results
+        results.sort(key=lambda item: item['score_key'], reverse=True)
+        return results[:top_n]
