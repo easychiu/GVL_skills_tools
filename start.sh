@@ -44,7 +44,8 @@ case $choice in
     1)
         echo ""
         echo "🚀 啟動 Web 應用..."
-        echo "📍 訪問: http://127.0.0.1:5000"
+        echo "💻 電腦本機: http://127.0.0.1:5000"
+        echo "📱 手機同 Wi-Fi: http://<你的電腦IP>:5000"
         echo "⌨️  按 Ctrl+C 停止"
         echo ""
         python main.py web

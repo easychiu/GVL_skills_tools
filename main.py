@@ -2,6 +2,7 @@
 """GVL 裝備表系統主入口"""
 import sys
 import argparse
+import socket
 from pathlib import Path
 
 # 添加gvl_app到路徑
@@ -41,7 +42,7 @@ def main():
     
     # web 子命令
     web_parser = subparsers.add_parser('web', help='啟動網頁應用')
-    web_parser.add_argument('--host', '-H', default='127.0.0.1', help='監聽地址')
+    web_parser.add_argument('--host', '-H', default='0.0.0.0', help='監聽地址（預設支援同網路手機連線）')
     web_parser.add_argument('--port', '-P', type=int, default=5000, help='監聽端口')
     web_parser.add_argument('--debug', '-d', action='store_true', help='調試模式')
     
@@ -98,10 +99,24 @@ def main():
     elif args.mode == 'web':
         # 啟動網頁應用
         from app import app
+
+        display_host = args.host
+        if args.host == '0.0.0.0':
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                    s.connect(('8.8.8.8', 80))
+                    display_host = s.getsockname()[0]
+            except OSError:
+                display_host = '<你的電腦IP>'
+
         print("\n" + "="*60)
         print("🚀 GVL 裝備表 Web 應用已啟動")
         print("="*60)
-        print(f"📍 本地位址: http://{args.host}:{args.port}")
+        if args.host == '0.0.0.0':
+            print(f"💻 本機位址: http://127.0.0.1:{args.port}")
+            print(f"📱 手機位址: http://{display_host}:{args.port}")
+        else:
+            print(f"📍 位址: http://{args.host}:{args.port}")
         print(f"🛠️  模式: {'調試' if args.debug else '生產'}")
         print("✋ 按 Ctrl+C 停止服務器")
         print("="*60 + "\n")
