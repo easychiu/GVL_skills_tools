@@ -8,6 +8,22 @@ let state = {
     characterOptions: null
 };
 
+const CHARACTER_SLOT_SIDE_ORDER = [
+    ['飾品1', 'left'],
+    ['飾品2', 'left'],
+    ['寶物1', 'left'],
+    ['寶物2', 'left'],
+    ['主武', 'left'],
+    ['副武', 'left'],
+    ['頭盔', 'right'],
+    ['衣服', 'right'],
+    ['手套', 'right'],
+    ['鞋子', 'right']
+];
+const CHARACTER_SLOT_ORDER = CHARACTER_SLOT_SIDE_ORDER.map(([slotName]) => slotName);
+const CHARACTER_SLOT_SIDE_MAP = Object.fromEntries(CHARACTER_SLOT_SIDE_ORDER);
+const CHARACTER_DUPLICATE_POSITIONS = new Set(['飾品', '寶物']);
+
 function escapeHtml(value) {
     return String(value)
         .replace(/&/g, '&amp;')
@@ -449,41 +465,24 @@ function renderCharacterEquipmentForm(equipmentByPosition) {
  * @returns {Array<{position: string, label: string, equipmentNames: string[], side: string}>}
  */
 function buildCharacterSlotPlan(equipmentByPosition) {
-    const order = [
-        '飾品1', '飾品2', '寶物1', '寶物2', '主武', '副武',
-        '頭盔', '衣服', '手套', '鞋子'
-    ];
-    const sideBySlot = {
-        '飾品1': 'left',
-        '飾品2': 'left',
-        '寶物1': 'left',
-        '寶物2': 'left',
-        '主武': 'left',
-        '副武': 'left',
-        '頭盔': 'right',
-        '衣服': 'right',
-        '手套': 'right',
-        '鞋子': 'right'
-    };
-    const duplicatePositions = new Set(['飾品', '寶物']);
     const slots = [];
 
     Object.entries(equipmentByPosition).forEach(([position, equipmentNames]) => {
-        const copyCount = duplicatePositions.has(position) ? 2 : 1;
+        const copyCount = CHARACTER_DUPLICATE_POSITIONS.has(position) ? 2 : 1;
         for (let i = 1; i <= copyCount; i++) {
             const slotName = copyCount === 2 ? `${position}${i}` : position;
             slots.push({
                 position,
                 label: slotName,
                 equipmentNames: equipmentNames || [],
-                side: sideBySlot[slotName] || sideBySlot[position] || 'right'
+                side: CHARACTER_SLOT_SIDE_MAP[slotName] || CHARACTER_SLOT_SIDE_MAP[position] || 'right'
             });
         }
     });
 
     return slots.sort((a, b) => {
-        const aIndex = order.indexOf(a.label);
-        const bIndex = order.indexOf(b.label);
+        const aIndex = CHARACTER_SLOT_ORDER.indexOf(a.label);
+        const bIndex = CHARACTER_SLOT_ORDER.indexOf(b.label);
         const indexA = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
         const indexB = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
         if (indexA !== indexB) {
