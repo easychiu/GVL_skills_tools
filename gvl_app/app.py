@@ -24,10 +24,16 @@ def add_api_cors_headers(response):
     if request.path.startswith('/api/'):
         response.headers['Access-Control-Allow-Origin'] = API_CORS_ALLOW_ORIGIN
         response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
         if API_CORS_ALLOW_ORIGIN != '*':
             response.headers['Vary'] = 'Origin'
     return response
+
+
+@app.route('/api/<path:_path>', methods=['OPTIONS'])
+def api_preflight(_path):
+    """處理 API 跨域預檢請求。"""
+    return ('', 204)
 
 
 @app.route('/')
@@ -206,6 +212,8 @@ def api_character_suggest_builds():
         return jsonify({'error': 'priority_skills 必須為陣列'}), 400
     if not priority_skills:
         return jsonify({'error': 'priority_skills 不可為空'}), 400
+    if profession not in handler.get_professions():
+        return jsonify({'error': f'不支持的職業: {profession}'}), 400
 
     try:
         top_n = int(top_n)
@@ -228,7 +236,7 @@ def api_character_suggest_builds():
             exclude_quality=exclude_quality,
         )
     except ValueError:
-        return jsonify({'error': f'不支持的職業: {profession}'}), 400
+        return jsonify({'error': '自動配裝參數錯誤，請確認職業與優先技能設定'}), 400
 
     return jsonify({
         'profession': profession,
