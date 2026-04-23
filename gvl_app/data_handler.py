@@ -199,7 +199,7 @@ class GVLDataHandler:
             ValueError: 職業名稱不存在時拋出
         """
         if profession not in self.professions:
-            raise ValueError('不支持的職業')
+            raise ValueError(f'不支持的職業: {profession}')
 
         profession_bonus = self.professions[profession]
         equipment_skills = {}

@@ -2,6 +2,7 @@
 from flask import Flask, render_template, request, jsonify, send_from_directory
 import os
 from pathlib import Path
+from werkzeug.exceptions import BadRequest
 from data_handler import GVLDataHandler
 
 # 初始化Flask應用
@@ -135,7 +136,16 @@ def api_character_calculate():
     Response JSON:
         職業、已選裝備、裝備技能、職業加成、總技能
     """
-    payload = request.get_json(silent=True) or {}
+    try:
+        payload = request.get_json()
+    except BadRequest:
+        return jsonify({'error': 'JSON 格式錯誤'}), 400
+
+    if payload is None:
+        payload = {}
+    if not isinstance(payload, dict):
+        return jsonify({'error': '請提供 JSON 物件'}), 400
+
     profession = payload.get('profession', '通用')
     equipment_names = payload.get('equipment_names', [])
 
@@ -144,8 +154,8 @@ def api_character_calculate():
 
     try:
         result = handler.calculate_character_skills(profession, equipment_names)
-    except ValueError:
-        return jsonify({'error': '不支持的職業'}), 400
+    except ValueError as err:
+        return jsonify({'error': str(err)}), 400
 
     return jsonify(result)
 
