@@ -226,6 +226,11 @@ class CharacterTab(ttk.Frame):
         self._slot_display_to_name: Dict[str, Dict[str, str]] = {}
         # skill hint label below each combobox
         self._slot_skill_labels: Dict[str, tk.Label] = {}
+        # slot label → equipment position (for apply-plan logic)
+        self._slot_positions: Dict[str, str] = {}
+        # auto-build priority skill controls
+        self._auto_skill_vars: List[tk.StringVar] = []
+        self._auto_skill_cbs: List[ttk.Combobox] = []
         self._build()
         self._load_options()
 
@@ -248,6 +253,23 @@ class CharacterTab(ttk.Frame):
 
         self._sailor_hint = ttk.Label(ctrl, text='', foreground='gray')
         self._sailor_hint.grid(row=0, column=3, padx=(8, 0), sticky='w')
+
+        # 自動配裝控制面板
+        auto_lf = ttk.LabelFrame(self, text='⚡ 自動配裝', padding=8)
+        auto_lf.pack(fill='x', padx=10, pady=(0, 4))
+
+        for i in range(3):
+            ttk.Label(auto_lf, text=f'優先 {i + 1}：').pack(
+                side='left', padx=(16 if i > 0 else 0, 2))
+            var = tk.StringVar()
+            self._auto_skill_vars.append(var)
+            cb = ttk.Combobox(auto_lf, textvariable=var, state='readonly', width=16)
+            cb.pack(side='left')
+            self._auto_skill_cbs.append(cb)
+            cb.bind('<<ComboboxSelected>>', self._on_auto_skill_select)
+
+        ttk.Button(auto_lf, text='🔧 自動配裝',
+                   command=self._auto_build).pack(side='left', padx=(24, 0))
 
         # 中央：左欄 + 右欄 + 結果面板
         main = tk.Frame(self, bg=APP_BG)
@@ -292,6 +314,7 @@ class CharacterTab(ttk.Frame):
         for slot in self._build_slot_plan(eq_by_pos):
             var = tk.StringVar()
             self._slot_vars[slot['label']] = var
+            self._slot_positions[slot['label']] = slot['position']
             parent = self._left_frame if slot['side'] == 'left' else self._right_frame
 
             lf = ttk.LabelFrame(parent, text=slot['label'], padding=4)
@@ -330,6 +353,12 @@ class CharacterTab(ttk.Frame):
             cb.bind('<<ComboboxSelected>>',
                     lambda e, lbl=slot['label'], sv=var, sl=skill_lbl, dm=display_map:
                     self._on_slot_change(lbl, sv, sl, dm))
+
+        # 初始化自動配裝技能下拉選單
+        all_skills_sorted = ['（不選）'] + sorted(self.handler.skills)
+        for acb in self._auto_skill_cbs:
+            acb['values'] = all_skills_sorted
+            acb.current(0)
 
         self._on_change()
 
@@ -393,6 +422,174 @@ class CharacterTab(ttk.Frame):
             self._result_panel.update_results(result)
         except ValueError:
             pass
+
+    def _on_auto_skill_select(self, _event=None):
+        """更新自動配裝技能下拉選單，防止重複選擇"""
+        all_skills = sorted(self.handler.skills)
+        for i, (acb, var) in enumerate(zip(self._auto_skill_cbs, self._auto_skill_vars)):
+            current = var.get()
+            others_selected = {
+                v.get() for j, v in enumerate(self._auto_skill_vars)
+                if j != i and v.get() and v.get() != '（不選）'
+            }
+            available = ['（不選）'] + [s for s in all_skills if s not in others_selected]
+            acb['values'] = available
+            if current and current not in available:
+                var.set('（不選）')
+
+    def _auto_build(self):
+        """執行自動配裝並顯示結果對話視窗"""
+        profession = self._prof_var.get()
+        if not profession:
+            messagebox.showwarning('警告', '請先選擇職業')
+            return
+
+        priority_skills = [
+            v.get() for v in self._auto_skill_vars
+            if v.get() and v.get() != '（不選）'
+        ]
+        if not priority_skills:
+            messagebox.showwarning('警告', '請至少選擇一個優先技能')
+            return
+
+        is_sailor = self._sailor_var.get()
+        try:
+            plans = self.handler.suggest_builds(
+                profession, priority_skills, is_sailor=is_sailor, top_n=5
+            )
+        except Exception as exc:
+            messagebox.showerror('錯誤', str(exc))
+            return
+
+        if not plans:
+            messagebox.showinfo('自動配裝', '找不到符合條件的配裝方案')
+            return
+
+        AutoBuildDialog(self, plans, priority_skills, self._apply_plan)
+
+    def _apply_plan(self, equipment_names: List[str]):
+        """將自動配裝方案套用至各槽位"""
+        # 建立位置 → 裝備名稱清單的映射
+        pos_to_names: Dict[str, List[str]] = {}
+        for name in equipment_names:
+            eq = self.handler.get_equipment_by_name(name)
+            if eq:
+                pos_to_names.setdefault(eq['position'], []).append(name)
+
+        # 記錄每個位置已分配的索引
+        pos_assigned: Dict[str, int] = {}
+
+        for slot_label, var in self._slot_vars.items():
+            pos = self._slot_positions.get(slot_label, '')
+            names_for_pos = pos_to_names.get(pos, [])
+            idx = pos_assigned.get(pos, 0)
+
+            if idx < len(names_for_pos):
+                real_name = names_for_pos[idx]
+                pos_assigned[pos] = idx + 1
+
+                # 找出對應的顯示文字
+                display_map = self._slot_display_to_name.get(slot_label, {})
+                inv_map = {v: k for k, v in display_map.items()}
+                display = inv_map.get(real_name, '（不裝備）')
+                var.set(display)
+
+                # 更新技能提示標籤
+                skill_lbl = self._slot_skill_labels.get(slot_label)
+                if skill_lbl:
+                    text = self._skills_detail_text(display, display_map, self.handler)
+                    skill_lbl.config(text=text)
+            else:
+                var.set('（不裝備）')
+                skill_lbl = self._slot_skill_labels.get(slot_label)
+                if skill_lbl:
+                    skill_lbl.config(text='')
+
+        self._on_change()
+
+
+# ─── AutoBuildDialog ──────────────────────────────────────────────────────
+class AutoBuildDialog(tk.Toplevel):
+    """自動配裝結果對話視窗：顯示 Top-N 套方案，可一鍵套用至角色配裝頁"""
+
+    def __init__(self, parent, plans: List[Dict], priority_skills: List[str],
+                 apply_callback):
+        super().__init__(parent)
+        self.plans = plans
+        self.apply_callback = apply_callback
+        self.title('⚡ 自動配裝結果')
+        self.geometry('1020x480')
+        self.resizable(True, True)
+        self.transient(parent)
+        self.grab_set()
+        self._build(priority_skills)
+
+    def _build(self, priority_skills: List[str]):
+        # 頁首
+        hdr = tk.Frame(self, bg=HEADER_BG)
+        hdr.pack(fill='x')
+        p_text = ' ＞ '.join(priority_skills) if priority_skills else '（無優先技能）'
+        tk.Label(hdr,
+                 text=f'優先技能：{p_text}　　共 {len(self.plans)} 套方案',
+                 bg=HEADER_BG, fg=HEADER_FG, font=FONT_BOLD,
+                 pady=8).pack()
+
+        # 方案表格
+        lf = ttk.LabelFrame(self, text='配裝方案（雙擊或選中後點「套用」）', padding=8)
+        lf.pack(fill='both', expand=True, padx=10, pady=8)
+
+        p_cols = list(priority_skills)
+        cols = ['方案'] + p_cols + ['裝備清單']
+        self._tree = ttk.Treeview(lf, columns=cols, show='headings', height=10)
+
+        self._tree.heading('方案', text='方案')
+        self._tree.column('方案', width=60, minwidth=50, anchor='center')
+
+        for ps in p_cols:
+            self._tree.heading(ps, text=ps)
+            self._tree.column(ps, width=100, minwidth=70, anchor='center')
+
+        self._tree.heading('裝備清單', text='裝備清單')
+        self._tree.column('裝備清單', width=680, minwidth=200)
+
+        sb_y = ttk.Scrollbar(lf, command=self._tree.yview)
+        self._tree.configure(yscrollcommand=sb_y.set)
+        self._tree.pack(side='left', fill='both', expand=True)
+        sb_y.pack(side='right', fill='y')
+
+        for i, plan in enumerate(self.plans):
+            pv = plan['priority_values']
+            p_vals = [str(pv.get(ps, 0)) for ps in p_cols]
+            eq_list = '、'.join(plan['equipment_names'])
+            self._tree.insert('', 'end', iid=str(i),
+                              values=[f'方案 {i + 1}'] + p_vals + [eq_list])
+
+        # 預設選中第一筆
+        if self.plans:
+            self._tree.selection_set('0')
+            self._tree.focus('0')
+
+        self._tree.bind('<Double-1>', lambda _e: self._apply_selected())
+
+        # 底部按鈕列
+        btn_row = tk.Frame(self)
+        btn_row.pack(fill='x', padx=10, pady=(0, 10))
+
+        ttk.Button(btn_row, text='✔ 套用選中方案',
+                   command=self._apply_selected).pack(side='left', padx=4)
+        ttk.Button(btn_row, text='✖ 關閉',
+                   command=self.destroy).pack(side='left', padx=4)
+        ttk.Label(btn_row, text='提示：可雙擊方案快速套用',
+                  foreground='gray').pack(side='left', padx=16)
+
+    def _apply_selected(self):
+        sel = self._tree.selection()
+        if not sel:
+            messagebox.showwarning('警告', '請先選擇一個方案', parent=self)
+            return
+        idx = int(sel[0])
+        self.apply_callback(self.plans[idx]['equipment_names'])
+        self.destroy()
 
 
 # ─── SearchTab ────────────────────────────────────────────────────────────

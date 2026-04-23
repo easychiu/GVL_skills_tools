@@ -386,3 +386,126 @@ class GVLDataHandler:
                 for pos in self.positions
             }
         }
+
+    def suggest_builds(
+        self,
+        profession: str,
+        priority_skills: List[str],
+        is_sailor: bool = False,
+        top_n: int = 5,
+        candidates_per_slot: int = 3,
+    ) -> List[Dict[str, Any]]:
+        """根據優先技能搜尋最佳 Top-N 配裝方案。
+
+        算法：每個槽位保留 candidates_per_slot 件高分候選，枚舉所有組合後
+        依 (優先技能1總值, 優先技能2總值, 優先技能3總值, 全技能加成總和) 排序，
+        去重後回傳前 top_n 套。
+
+        Args:
+            profession: 職業名稱
+            priority_skills: 優先技能清單（最多 3 個，可含空字串）
+            is_sailor: 是否套用航海士 +1
+            top_n: 回傳方案數量
+            candidates_per_slot: 每個槽位保留的候選裝備數（影響計算速度與品質）
+
+        Returns:
+            方案列表，每筆包含：
+              - equipment_names: 裝備名稱清單
+              - score_key: 排序用分數 tuple (p1, p2, p3, total_bonus)
+              - priority_values: {技能名: 合計值} 字典
+              - skill_result: 完整技能計算結果（同 calculate_character_skills 輸出）
+
+        Raises:
+            ValueError: 職業名稱不存在時拋出
+        """
+        from itertools import product as iterproduct
+
+        if profession not in self.professions:
+            raise ValueError(f'不支持的職業: {profession}')
+
+        # 只保留有效技能
+        p_skills = [s for s in priority_skills if s and s in self.skills]
+
+        # 槽位配置常數（與 CharacterTab 保持一致）
+        _DUPLICATE = {'飾品', '寶物'}
+        _SLOT_ORDER = ['飾品1', '飾品2', '寶物1', '寶物2', '主武', '副武',
+                       '頭盔', '衣服', '手套', '鞋子']
+
+        # 建立各位置裝備清單
+        eq_by_pos: Dict[str, List[dict]] = {}
+        for pos in sorted(self.positions):
+            eq_by_pos[pos] = sorted(
+                self.get_equipment_by_position(pos), key=lambda e: e['name']
+            )
+
+        # 展開雙槽位（飾品/寶物各兩個）
+        slots: List[Dict[str, Any]] = []
+        for pos, equipment in eq_by_pos.items():
+            count = 2 if pos in _DUPLICATE else 1
+            for i in range(1, count + 1):
+                label = f'{pos}{i}' if count > 1 else pos
+                slots.append({'label': label, 'position': pos, 'equipment': equipment})
+
+        order_map = {s: idx for idx, s in enumerate(_SLOT_ORDER)}
+        slots.sort(key=lambda s: order_map.get(s['label'], 999))
+
+        def _score(eq: dict) -> tuple:
+            """裝備優先技能評分 tuple：(p1, p2, p3, total_bonus)"""
+            sk = eq.get('skills', {})
+            pvals = tuple(sk.get(s, 0) for s in p_skills)
+            return pvals + (sum(sk.values()),)
+
+        # 每槽保留 Top-K 候選；槽位無裝備時以 None 占位
+        slot_candidates: List[List[Optional[dict]]] = []
+        for slot in slots:
+            eq_list = slot['equipment']
+            if not eq_list:
+                slot_candidates.append([None])
+                continue
+            scored = sorted(eq_list, key=_score, reverse=True)
+            slot_candidates.append(scored[:candidates_per_slot])
+
+        # 枚舉所有組合並計算分數
+        scored_combos: List[tuple] = []
+        for combo in iterproduct(*slot_candidates):
+            pvals = [0] * len(p_skills)
+            total_bonus = 0
+            eq_names: List[str] = []
+            for eq in combo:
+                if eq is None:
+                    continue
+                sk = eq.get('skills', {})
+                for i, ps in enumerate(p_skills):
+                    pvals[i] += sk.get(ps, 0)
+                total_bonus += sum(sk.values())
+                eq_names.append(eq['name'])
+            score_key = tuple(pvals) + (total_bonus,)
+            scored_combos.append((score_key, eq_names))
+
+        # 降序排列，去重（排列不同但裝備集合相同視為同一套），取前 top_n
+        scored_combos.sort(key=lambda x: x[0], reverse=True)
+
+        seen: set = set()
+        results: List[Dict[str, Any]] = []
+        for score_key, eq_names in scored_combos:
+            sig = tuple(sorted(eq_names))
+            if sig in seen:
+                continue
+            seen.add(sig)
+            try:
+                skill_result = self.calculate_character_skills(
+                    profession, eq_names, is_sailor=is_sailor
+                )
+            except ValueError:
+                continue
+            priority_values = {p_skills[i]: score_key[i] for i in range(len(p_skills))}
+            results.append({
+                'equipment_names': eq_names,
+                'score_key': score_key,
+                'priority_values': priority_values,
+                'skill_result': skill_result,
+            })
+            if len(results) >= top_n:
+                break
+
+        return results
