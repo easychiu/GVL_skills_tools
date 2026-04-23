@@ -485,7 +485,12 @@ function renderCharacterEquipmentForm(equipmentByPosition) {
         slot.equipmentNames.forEach(name => {
             const option = document.createElement('option');
             option.value = name;
-            option.textContent = name;
+            const skills = state.equipmentSkillsMap[name] || {};
+            const skillStr = Object.entries(skills)
+                .filter(([, v]) => v)
+                .map(([k, v]) => `${k}+${v}`)
+                .join(' ');
+            option.textContent = skillStr ? `${name} [${skillStr}]` : name;
             select.appendChild(option);
         });
 
