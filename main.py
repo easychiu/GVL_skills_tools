@@ -15,6 +15,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
+  # 互動式配裝計算器
+  python main.py interactive
+
   # 啟動網頁應用
   python main.py web
   
@@ -26,6 +29,9 @@ def main():
     )
     
     subparsers = parser.add_subparsers(dest='mode', help='運行模式')
+    
+    # interactive 子命令
+    subparsers.add_parser('interactive', help='互動式配裝計算器（純 Python 終端版）')
     
     # web 子命令
     web_parser = subparsers.add_parser('web', help='啟動網頁應用')
@@ -67,7 +73,15 @@ def main():
         parser.print_help()
         sys.exit(0)
     
-    if args.mode == 'web':
+    if args.mode == 'interactive':
+        from interactive import GVLInteractiveApp
+        excel_file = Path(__file__).parent / 'GVL裝備表.xlsx'
+        if not excel_file.exists():
+            print(f"錯誤: Excel文件未找到: {excel_file}")
+            sys.exit(1)
+        GVLInteractiveApp(str(excel_file)).run()
+
+    elif args.mode == 'web':
         # 啟動網頁應用
         from app import app
         print("\n" + "="*60)

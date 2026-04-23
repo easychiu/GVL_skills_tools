@@ -47,13 +47,13 @@ class GVLCLIApp:
         """列表命令"""
         if args.positions:
             print("\n所有位置:")
-            for i, pos in enumerate(sorted(handler.positions), 1):
+            for i, pos in enumerate(sorted(self.handler.positions), 1):
                 count = len(self.handler.get_equipment_by_position(pos))
                 print(f"  {i}. {pos} ({count} 件)")
         
         if args.skills:
             print("\n所有技能:")
-            for i, skill in enumerate(sorted(handler.skills), 1):
+            for i, skill in enumerate(sorted(self.handler.skills), 1):
                 count = len(self.handler.get_equipment_by_skill(skill))
                 print(f"  {i}. {skill} ({count} 件)")
         
