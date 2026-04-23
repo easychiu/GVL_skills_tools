@@ -109,7 +109,7 @@ def api_professions():
 
 @app.route('/api/character/options')
 def api_character_options():
-    """獲取角色配裝選項API"""
+    """獲取角色配裝選項API，包含位置、裝備列表與職業資訊"""
     equipment_by_position = {}
     for position in sorted(handler.positions):
         position_equipment = handler.get_equipment_by_position(position)
@@ -126,7 +126,15 @@ def api_character_options():
 
 @app.route('/api/character/calculate', methods=['POST'])
 def api_character_calculate():
-    """計算角色技能API"""
+    """計算角色技能API
+
+    Request JSON:
+        profession: 職業名稱
+        equipment_names: 裝備名稱陣列
+
+    Response JSON:
+        職業、已選裝備、裝備技能、職業加成、總技能
+    """
     payload = request.get_json(silent=True) or {}
     profession = payload.get('profession', '通用')
     equipment_names = payload.get('equipment_names', [])
@@ -137,7 +145,7 @@ def api_character_calculate():
     try:
         result = handler.calculate_character_skills(profession, equipment_names)
     except ValueError:
-        return jsonify({'error': '職業參數無效'}), 400
+        return jsonify({'error': '不支持的職業'}), 400
 
     return jsonify(result)
 
