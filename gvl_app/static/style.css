@@ -265,6 +265,48 @@ h3 {
     font-weight: 700;
 }
 
+/* 裝備選單底色：砲術系 / 白兵系 */
+select.slot-cannon {
+    background-color: #cce5ff;
+    color: #004085;
+}
+
+select.slot-boarding {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+/* 顏色說明圖例 */
+.slot-color-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #f0f4fa;
+    border-radius: 6px;
+    font-size: 0.85em;
+    margin-bottom: 8px;
+}
+
+.legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.legend-cannon {
+    background-color: #cce5ff;
+    color: #004085;
+}
+
+.legend-boarding {
+    background-color: #d4edda;
+    color: #155724;
+}
+
 /* 分頁控件 */
 .pagination-controls {
     text-align: center;

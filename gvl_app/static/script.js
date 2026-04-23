@@ -5,7 +5,8 @@ let state = {
     currentPage: 1,
     perPage: 20,
     totalPages: 1,
-    characterOptions: null
+    characterOptions: null,
+    equipmentSkillsMap: {}
 };
 
 const CHARACTER_SLOT_SIDE_ORDER = [
@@ -24,6 +25,42 @@ const CHARACTER_SLOT_SIDE_MAP = Object.fromEntries(CHARACTER_SLOT_SIDE_ORDER);
 const CHARACTER_DUPLICATE_POSITIONS = new Set(['飾品', '寶物']);
 const DEFAULT_SLOT_SIDE = 'right';
 const DUPLICATE_SLOT_COUNT = 2;
+
+// 裝備類型判斷：砲術系 vs 白兵(跳幫)系
+const CANNON_SKILLS = new Set(['砲術', '水平', '彈道', '貫穿']);
+const BOARDING_SKILLS = new Set(['突擊', '戰術', '射擊']);
+
+/**
+ * 依技能判斷裝備類型：cannon（砲術系）、boarding（白兵系）或 neutral
+ * @param {string} name 裝備名稱
+ * @returns {'cannon'|'boarding'|'neutral'}
+ */
+function classifyEquipment(name) {
+    const skills = state.equipmentSkillsMap[name] || {};
+    let cannonScore = 0;
+    let boardingScore = 0;
+    for (const [skill, level] of Object.entries(skills)) {
+        if (CANNON_SKILLS.has(skill)) cannonScore += level;
+        if (BOARDING_SKILLS.has(skill)) boardingScore += level;
+    }
+    if (cannonScore > 0 && cannonScore >= boardingScore) return 'cannon';
+    if (boardingScore > 0 && boardingScore > cannonScore) return 'boarding';
+    return 'neutral';
+}
+
+/**
+ * 依裝備類型更新選單底色
+ * @param {HTMLSelectElement} selectEl
+ */
+function updateSlotColor(selectEl) {
+    const type = selectEl.value ? classifyEquipment(selectEl.value) : 'neutral';
+    selectEl.classList.remove('slot-cannon', 'slot-boarding');
+    if (type === 'cannon') {
+        selectEl.classList.add('slot-cannon');
+    } else if (type === 'boarding') {
+        selectEl.classList.add('slot-boarding');
+    }
+}
 
 function escapeHtml(value) {
     return String(value)
@@ -344,6 +381,7 @@ function loadCharacterOptions() {
         .then(response => response.json())
         .then(data => {
             state.characterOptions = data;
+            state.equipmentSkillsMap = data.equipment_skills_map || {};
             renderProfessionOptions(data.professions);
             renderCharacterEquipmentForm(data.equipment_by_position);
             renderSailorSkillsHint(data.sailor_skills || []);
@@ -469,7 +507,11 @@ function renderCharacterEquipmentForm(equipmentByPosition) {
  */
 function setupCharacterAutoCalculate() {
     document.querySelectorAll('#characterEquipmentForm select').forEach(select => {
-        select.addEventListener('change', calculateCharacterSkills);
+        select.addEventListener('change', () => {
+            updateSlotColor(select);
+            calculateCharacterSkills();
+        });
+        updateSlotColor(select);
     });
 
     const professionSelect = document.getElementById('professionSelect');

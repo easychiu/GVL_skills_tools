@@ -118,9 +118,12 @@ def api_character_options():
             [eq['name'] for eq in position_equipment]
         )
 
+    equipment_skills_map = {eq['name']: eq['skills'] for eq in handler.all_equipment}
+
     return jsonify({
         'positions': sorted(list(handler.positions)),
         'equipment_by_position': equipment_by_position,
+        'equipment_skills_map': equipment_skills_map,
         'professions': handler.get_professions(),
         'sailor_skills': sorted(list(handler.sailor_skills))
     })
