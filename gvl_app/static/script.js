@@ -8,6 +8,15 @@ let state = {
     characterOptions: null
 };
 
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
     initializePage();
@@ -424,22 +433,27 @@ function displayCharacterResults(data) {
     const content = document.getElementById('characterResultsContent');
 
     const totalSkillsHtml = Object.entries(data.total_skills)
-        .map(([skill, level]) => `<span class="skill-item">${skill}(+${level})</span>`)
+        .map(([skill, level]) => `<span class="skill-item">${escapeHtml(skill)}(+${escapeHtml(level)})</span>`)
         .join('') || '<em>目前沒有技能加成</em>';
 
     const professionBonusHtml = Object.entries(data.profession_bonus)
-        .map(([skill, level]) => `<span class="skill-item">${skill}(+${level})</span>`)
+        .map(([skill, level]) => `<span class="skill-item">${escapeHtml(skill)}(+${escapeHtml(level)})</span>`)
         .join('') || '<em>此職業無額外技能加成</em>';
 
     const selectedEquipmentHtml = data.selected_equipment
-        .map(eq => `<li>${eq.position}：${eq.name}</li>`)
+        .map(eq => `<li>${escapeHtml(eq.position)}：${escapeHtml(eq.name)}</li>`)
         .join('') || '<li>尚未選擇裝備</li>';
+
+    const invalidEquipmentHtml = (data.invalid_equipment || [])
+        .map(name => `<li>${escapeHtml(name)}</li>`)
+        .join('');
 
     content.innerHTML = `
         <div class="character-summary">
-            <div><strong>職業：</strong>${data.profession}</div>
+            <div><strong>職業：</strong>${escapeHtml(data.profession)}</div>
             <div><strong>已選裝備：</strong></div>
             <ul>${selectedEquipmentHtml}</ul>
+            ${invalidEquipmentHtml ? `<div><strong>未找到裝備：</strong><ul>${invalidEquipmentHtml}</ul></div>` : ''}
         </div>
         <div class="character-skills-block">
             <h4>職業技能加成</h4>

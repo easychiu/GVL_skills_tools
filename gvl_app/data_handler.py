@@ -21,7 +21,7 @@ class GVLDataHandler:
         self.skills = set()
         self.professions = {}
         self.load_data()
-        self.professions = self._build_professions()
+        self.professions = self._get_profession_data()
 
     def load_data(self):
         """從Excel文件加載數據"""
@@ -96,8 +96,8 @@ class GVLDataHandler:
                 # 跳過有問題的行
                 continue
 
-    def _build_professions(self) -> Dict[str, Dict[str, int]]:
-        """構建職業與技能加成映射"""
+    def _get_profession_data(self) -> Dict[str, Dict[str, int]]:
+        """獲取預設職業與技能加成映射"""
         return {
             '通用': {},
             '冒險家': {
@@ -204,10 +204,12 @@ class GVLDataHandler:
         profession_bonus = self.professions[profession]
         equipment_skills = {}
         selected_equipment = []
+        invalid_equipment = []
 
         for name in equipment_names:
             eq = self.get_equipment_by_name(name)
             if not eq:
+                invalid_equipment.append(name)
                 continue
             selected_equipment.append({
                 'position': eq['position'],
@@ -227,6 +229,7 @@ class GVLDataHandler:
         return {
             'profession': profession,
             'selected_equipment': selected_equipment,
+            'invalid_equipment': invalid_equipment,
             'equipment_skills': equipment_skills,
             'profession_bonus': profession_bonus,
             'total_skills': total_skills
