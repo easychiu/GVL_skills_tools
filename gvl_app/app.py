@@ -121,7 +121,8 @@ def api_character_options():
     return jsonify({
         'positions': sorted(list(handler.positions)),
         'equipment_by_position': equipment_by_position,
-        'professions': handler.get_professions()
+        'professions': handler.get_professions(),
+        'sailor_skills': sorted(list(handler.sailor_skills))
     })
 
 
@@ -132,6 +133,7 @@ def api_character_calculate():
     Request JSON:
         profession: 職業名稱
         equipment_names: 裝備名稱陣列
+        is_sailor: 是否套用航海士 +1
 
     Response JSON:
         職業、已選裝備、裝備技能、職業加成、總技能
@@ -148,12 +150,15 @@ def api_character_calculate():
 
     profession = payload.get('profession', '通用')
     equipment_names = payload.get('equipment_names', [])
+    is_sailor = bool(payload.get('is_sailor', False))
 
     if not isinstance(equipment_names, list):
         return jsonify({'error': 'equipment_names 必須為陣列'}), 400
 
     try:
-        result = handler.calculate_character_skills(profession, equipment_names)
+        result = handler.calculate_character_skills(
+            profession, equipment_names, is_sailor=is_sailor
+        )
     except ValueError:
         return jsonify({'error': f'不支持的職業: {profession}'}), 400
 

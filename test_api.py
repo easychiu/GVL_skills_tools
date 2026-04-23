@@ -59,14 +59,15 @@ print("測試 /api/character/calculate:")
 response = client.post(
     '/api/character/calculate',
     json={
-        'profession': '砲術家',
-        'equipment_names': ['丁卡族戒指']
+        'profession': '大提督',
+        'equipment_names': ['丁卡族戒指'],
+        'is_sailor': True
     }
 )
 print(f"狀態碼: {response.status_code}")
 data = response.get_json()
 print(f"職業: {data['profession']}")
-print(f"總技能數: {len(data['total_skills'])}")
+print(f"最高技能數: {len(data['highest_skills'])}")
 print()
 
 print("✅ 所有 API 測試完成！")
