@@ -474,13 +474,11 @@ function setupCharacterAutoCalculate() {
 
     const professionSelect = document.getElementById('professionSelect');
     if (professionSelect) {
-        professionSelect.removeEventListener('change', calculateCharacterSkills);
         professionSelect.addEventListener('change', calculateCharacterSkills);
     }
 
     const sailorCheckbox = document.getElementById('sailorCheckbox');
     if (sailorCheckbox) {
-        sailorCheckbox.removeEventListener('change', calculateCharacterSkills);
         sailorCheckbox.addEventListener('change', calculateCharacterSkills);
     }
 }
@@ -496,7 +494,7 @@ function buildCharacterSlotPlan(equipmentByPosition) {
     Object.entries(equipmentByPosition).forEach(([position, equipmentNames]) => {
         const copyCount = CHARACTER_DUPLICATE_POSITIONS.has(position) ? DUPLICATE_SLOT_COUNT : 1;
         for (let i = 1; i <= copyCount; i++) {
-            const slotName = copyCount === DUPLICATE_SLOT_COUNT ? `${position}${i}` : position;
+            const slotName = copyCount > 1 ? `${position}${i}` : position;
             slots.push({
                 position,
                 label: slotName,
