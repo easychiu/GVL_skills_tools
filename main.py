@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent / 'gvl_app'))
 
 
 def get_lan_ip():
-    """嘗試取得本機區網 IPv4 位址。"""
+    """嘗試取得本機區網 IPv4 位址，失敗時回傳提示文字。"""
     try:
         host_info = socket.gethostbyname_ex(socket.gethostname())
         for ip in host_info[2]:
