@@ -27,7 +27,7 @@ const DEFAULT_SLOT_SIDE = 'right';
 const DUPLICATE_SLOT_COUNT = 2;
 
 // 裝備類型判斷：砲術系 vs 白兵(跳幫)系
-const CANNON_SKILLS = new Set(['砲術', '水平', '彈道', '貫穿']);
+const CANNON_SKILLS = new Set(['砲術', '水平', '彈道', '貫穿', '速射']);
 const BOARDING_SKILLS = new Set(['突擊', '戰術', '射擊']);
 
 /**
@@ -608,10 +608,6 @@ function displayCharacterResults(data) {
     const content = document.getElementById('characterResultsContent');
     const wasHidden = container.style.display === 'none';
 
-    const skillCapsHtml = renderSkillItems(data.skill_caps, false, '未設定角色技能上限');
-    const equipmentBonusHtml = renderSkillItems(data.equipment_skills, true, '目前沒有裝備技能加成');
-    const professionBonusHtml = renderSkillItems(data.profession_bonus, true, '此職業無額外技能加成');
-    const sailorBonusHtml = renderSkillItems(data.sailor_bonus, true, '未啟用航海士加成');
     const highestSkillsHtml = renderSkillItems(data.highest_skills, false, '目前沒有技能加成');
 
     const selectedEquipmentHtml = data.selected_equipment
@@ -629,22 +625,6 @@ function displayCharacterResults(data) {
             <div><strong>已選裝備：</strong></div>
             <ul>${selectedEquipmentHtml}</ul>
             ${invalidEquipmentHtml ? `<div><strong>未找到裝備：</strong><ul>${invalidEquipmentHtml}</ul></div>` : ''}
-        </div>
-        <div class="character-skills-block">
-            <h4>角色技能上限</h4>
-            <div>${skillCapsHtml}</div>
-        </div>
-        <div class="character-skills-block">
-            <h4>裝備技能加成（+x）</h4>
-            <div>${equipmentBonusHtml}</div>
-        </div>
-        <div class="character-skills-block">
-            <h4>職業技能加成</h4>
-            <div>${professionBonusHtml}</div>
-        </div>
-        <div class="character-skills-block">
-            <h4>航海士技能加成</h4>
-            <div>${sailorBonusHtml}</div>
         </div>
         <div class="character-skills-block">
             <h4>最高技能（角色上限 + 職業 + 裝備 + 航海士）</h4>
