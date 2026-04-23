@@ -20,9 +20,9 @@ const CHARACTER_SLOT_SIDE_ORDER = [
     ['手套', 'right'],
     ['鞋子', 'right']
 ];
-const CHARACTER_SLOT_ORDER = CHARACTER_SLOT_SIDE_ORDER.map(([slotName]) => slotName);
 const CHARACTER_SLOT_SIDE_MAP = Object.fromEntries(CHARACTER_SLOT_SIDE_ORDER);
 const CHARACTER_DUPLICATE_POSITIONS = new Set(['飾品', '寶物']);
+const DEFAULT_SLOT_SIDE = 'right';
 
 function escapeHtml(value) {
     return String(value)
@@ -475,14 +475,16 @@ function buildCharacterSlotPlan(equipmentByPosition) {
                 position,
                 label: slotName,
                 equipmentNames: equipmentNames || [],
-                side: CHARACTER_SLOT_SIDE_MAP[slotName] || CHARACTER_SLOT_SIDE_MAP[position] || 'right'
+                side: CHARACTER_SLOT_SIDE_MAP[slotName]
+                    || CHARACTER_SLOT_SIDE_MAP[position]
+                    || DEFAULT_SLOT_SIDE
             });
         }
     });
 
     return slots.sort((a, b) => {
-        const aIndex = CHARACTER_SLOT_ORDER.indexOf(a.label);
-        const bIndex = CHARACTER_SLOT_ORDER.indexOf(b.label);
+        const aIndex = CHARACTER_SLOT_SIDE_ORDER.findIndex(([slotName]) => slotName === a.label);
+        const bIndex = CHARACTER_SLOT_SIDE_ORDER.findIndex(([slotName]) => slotName === b.label);
         const indexA = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
         const indexB = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
         if (indexA !== indexB) {
