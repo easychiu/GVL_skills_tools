@@ -15,6 +15,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
+  # 啟動圖形化桌面應用（tkinter GUI）
+  python main.py gui
+
   # 互動式配裝計算器
   python main.py interactive
 
@@ -29,7 +32,10 @@ def main():
     )
     
     subparsers = parser.add_subparsers(dest='mode', help='運行模式')
-    
+
+    # gui 子命令
+    subparsers.add_parser('gui', help='啟動圖形化桌面應用（tkinter GUI）')
+
     # interactive 子命令
     subparsers.add_parser('interactive', help='互動式配裝計算器（純 Python 終端版）')
     
@@ -72,8 +78,16 @@ def main():
     if not args.mode:
         parser.print_help()
         sys.exit(0)
-    
-    if args.mode == 'interactive':
+
+    if args.mode == 'gui':
+        from gui import run_gui
+        excel_file = Path(__file__).parent / 'GVL裝備表.xlsx'
+        if not excel_file.exists():
+            print(f"錯誤: Excel文件未找到: {excel_file}")
+            sys.exit(1)
+        run_gui(str(excel_file))
+
+    elif args.mode == 'interactive':
         from interactive import GVLInteractiveApp
         excel_file = Path(__file__).parent / 'GVL裝備表.xlsx'
         if not excel_file.exists():
