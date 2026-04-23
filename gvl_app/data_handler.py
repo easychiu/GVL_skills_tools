@@ -7,6 +7,7 @@ import json
 
 class GVLDataHandler:
     """GVL裝備表數據處理類"""
+    HEADER_EQUIPMENT_NAME = '裝備名稱'
 
     def __init__(self, excel_file: str):
         """初始化數據處理器
@@ -22,6 +23,7 @@ class GVLDataHandler:
         self.professions = {}
         self.skill_caps = {}
         self.sailor_skills = set()
+        # Excel 內含重複標題列（位置=位置），需與職業/角色上限一併排除
         self.system_positions = {'位置', '職業', '角色上限'}
         self.load_data()
 
@@ -70,7 +72,7 @@ class GVLDataHandler:
         # 移除空行和標題行
         df = df.dropna(subset=['裝備名稱'])
         # 移除包含技能名稱作為值的行（通常是複製的標題）
-        df = df[df['裝備名稱'] != '裝備名稱']
+        df = df[df['裝備名稱'] != self.HEADER_EQUIPMENT_NAME]
         
         for _, row in df.iterrows():
             try:
@@ -127,7 +129,9 @@ class GVLDataHandler:
         """從資料源位置=職業載入職業技能加成"""
         df = self.data['source']
         profession_rows = df[df['位置'] == '職業'].dropna(subset=['裝備名稱'])
-        profession_rows = profession_rows[profession_rows['裝備名稱'] != '裝備名稱']
+        profession_rows = profession_rows[
+            profession_rows['裝備名稱'] != self.HEADER_EQUIPMENT_NAME
+        ]
 
         professions = {'通用': {}}
         for _, row in profession_rows.iterrows():
@@ -139,6 +143,10 @@ class GVLDataHandler:
                 continue
             professions[name] = self._extract_skill_values(row)
         return professions
+
+    def _sort_skill_map(self, skill_map: Dict[str, int]) -> Dict[str, int]:
+        """依照技能值降序、名稱升序排序技能映射"""
+        return dict(sorted(skill_map.items(), key=lambda item: (-item[1], item[0])))
 
     def _load_skill_caps_from_source(self) -> Dict[str, Dict[str, int]]:
         """從資料源位置=角色上限載入技能上限"""
@@ -296,13 +304,12 @@ class GVLDataHandler:
         for skill in all_skill_keys:
             highest_skills[skill] = skill_caps.get(skill, 0) + bonus_skills.get(skill, 0)
 
-        sort_by_value = lambda item: (-item[1], item[0])
-        equipment_skills = dict(sorted(equipment_skills.items(), key=sort_by_value))
-        profession_bonus = dict(sorted(profession_bonus.items(), key=sort_by_value))
-        sailor_bonus = dict(sorted(sailor_bonus.items(), key=sort_by_value))
-        skill_caps = dict(sorted(skill_caps.items(), key=sort_by_value))
-        bonus_skills = dict(sorted(bonus_skills.items(), key=sort_by_value))
-        highest_skills = dict(sorted(highest_skills.items(), key=sort_by_value))
+        equipment_skills = self._sort_skill_map(equipment_skills)
+        profession_bonus = self._sort_skill_map(profession_bonus)
+        sailor_bonus = self._sort_skill_map(sailor_bonus)
+        skill_caps = self._sort_skill_map(skill_caps)
+        bonus_skills = self._sort_skill_map(bonus_skills)
+        highest_skills = self._sort_skill_map(highest_skills)
 
         return {
             'profession': profession,

@@ -353,6 +353,21 @@ function renderSailorSkillsHint(sailorSkills) {
     hint.innerHTML = `<small>航海士可加成技能：${skillsText}</small>`;
 }
 
+function renderSkillItems(skills, withPlus = false, emptyText = '無') {
+    const entries = Object.entries(skills || {});
+    if (!entries.length) {
+        return `<em>${escapeHtml(emptyText)}</em>`;
+    }
+    return entries
+        .map(([skill, level]) => {
+            const valueText = withPlus
+                ? `+${escapeHtml(level)}`
+                : `${escapeHtml(level)}`;
+            return `<span class="skill-item">${escapeHtml(skill)}(${valueText})</span>`;
+        })
+        .join('');
+}
+
 /**
  * 顯示職業選項
  * @param {Object<string, Object<string, number>>} professions 職業與技能加成映射
@@ -454,25 +469,11 @@ function displayCharacterResults(data) {
     const container = document.getElementById('characterResults');
     const content = document.getElementById('characterResultsContent');
 
-    const skillCapsHtml = Object.entries(data.skill_caps || {})
-        .map(([skill, level]) => `<span class="skill-item">${escapeHtml(skill)}(${escapeHtml(level)})</span>`)
-        .join('') || '<em>未設定角色技能上限</em>';
-
-    const equipmentBonusHtml = Object.entries(data.equipment_skills || {})
-        .map(([skill, level]) => `<span class="skill-item">${escapeHtml(skill)}(+${escapeHtml(level)})</span>`)
-        .join('') || '<em>目前沒有裝備技能加成</em>';
-
-    const professionBonusHtml = Object.entries(data.profession_bonus || {})
-        .map(([skill, level]) => `<span class="skill-item">${escapeHtml(skill)}(+${escapeHtml(level)})</span>`)
-        .join('') || '<em>此職業無額外技能加成</em>';
-
-    const sailorBonusHtml = Object.entries(data.sailor_bonus || {})
-        .map(([skill, level]) => `<span class="skill-item">${escapeHtml(skill)}(+${escapeHtml(level)})</span>`)
-        .join('') || '<em>未啟用航海士加成</em>';
-
-    const highestSkillsHtml = Object.entries(data.highest_skills || {})
-        .map(([skill, level]) => `<span class="skill-item">${escapeHtml(skill)}(${escapeHtml(level)})</span>`)
-        .join('') || '<em>目前沒有技能加成</em>';
+    const skillCapsHtml = renderSkillItems(data.skill_caps, false, '未設定角色技能上限');
+    const equipmentBonusHtml = renderSkillItems(data.equipment_skills, true, '目前沒有裝備技能加成');
+    const professionBonusHtml = renderSkillItems(data.profession_bonus, true, '此職業無額外技能加成');
+    const sailorBonusHtml = renderSkillItems(data.sailor_bonus, true, '未啟用航海士加成');
+    const highestSkillsHtml = renderSkillItems(data.highest_skills, false, '目前沒有技能加成');
 
     const selectedEquipmentHtml = data.selected_equipment
         .map(eq => `<li>${escapeHtml(eq.position)}：${escapeHtml(eq.name)}</li>`)
