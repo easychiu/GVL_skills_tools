@@ -394,6 +394,7 @@ class GVLDataHandler:
         is_sailor: bool = False,
         top_n: int = 5,
         candidates_per_slot: int = 3,
+        skill_cap: int = 25,
     ) -> List[Dict[str, Any]]:
         """根據優先技能搜尋最佳 Top-N 配裝方案。
 
@@ -407,6 +408,7 @@ class GVLDataHandler:
             is_sailor: 是否套用航海士 +1
             top_n: 回傳方案數量
             candidates_per_slot: 每個槽位保留的候選裝備數（影響計算速度與品質）
+            skill_cap: 單一技能加成上限（超過此值的方案將被過濾，預設 25）
 
         Returns:
             方案列表，每筆包含：
@@ -506,6 +508,11 @@ class GVLDataHandler:
                     profession, eq_names, is_sailor=is_sailor
                 )
             except ValueError:
+                continue
+            # 過濾：任一技能加成超過上限的方案
+            if skill_cap > 0 and any(
+                v > skill_cap for v in skill_result.get('bonus_skills', {}).values()
+            ):
                 continue
             priority_values = {p_skills[i]: score_key[i] for i in range(len(p_skills))}
             results.append({

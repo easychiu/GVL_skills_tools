@@ -232,6 +232,7 @@ class CharacterTab(ttk.Frame):
         self._auto_skill_vars: List[tk.StringVar] = []
         self._auto_skill_cbs: List[ttk.Combobox] = []
         self._all_skills_sorted: List[str] = []
+        self._skill_cap_var: tk.StringVar = tk.StringVar(value='25')
         self._build()
         self._load_options()
 
@@ -271,6 +272,10 @@ class CharacterTab(ttk.Frame):
 
         ttk.Button(auto_lf, text='🔧 自動配裝',
                    command=self._auto_build).pack(side='left', padx=(24, 0))
+
+        ttk.Label(auto_lf, text='技能上限：').pack(side='left', padx=(24, 2))
+        ttk.Spinbox(auto_lf, textvariable=self._skill_cap_var,
+                    from_=1, to=99, width=5).pack(side='left')
 
         # 中央：左欄 + 右欄 + 結果面板
         main = tk.Frame(self, bg=APP_BG)
@@ -456,8 +461,13 @@ class CharacterTab(ttk.Frame):
 
         is_sailor = self._sailor_var.get()
         try:
+            skill_cap = int(self._skill_cap_var.get())
+        except ValueError:
+            skill_cap = 25
+        try:
             plans = self.handler.suggest_builds(
-                profession, priority_skills, is_sailor=is_sailor, top_n=5
+                profession, priority_skills, is_sailor=is_sailor,
+                top_n=5, skill_cap=skill_cap,
             )
         except Exception as exc:
             messagebox.showerror('錯誤', str(exc))
