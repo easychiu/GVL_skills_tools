@@ -23,6 +23,7 @@ const CHARACTER_SLOT_SIDE_ORDER = [
 const CHARACTER_SLOT_SIDE_MAP = Object.fromEntries(CHARACTER_SLOT_SIDE_ORDER);
 const CHARACTER_DUPLICATE_POSITIONS = new Set(['飾品', '寶物']);
 const DEFAULT_SLOT_SIDE = 'right';
+const DUPLICATE_SLOT_COUNT = 2;
 
 function escapeHtml(value) {
     return String(value)
@@ -468,9 +469,9 @@ function buildCharacterSlotPlan(equipmentByPosition) {
     const slots = [];
 
     Object.entries(equipmentByPosition).forEach(([position, equipmentNames]) => {
-        const copyCount = CHARACTER_DUPLICATE_POSITIONS.has(position) ? 2 : 1;
+        const copyCount = CHARACTER_DUPLICATE_POSITIONS.has(position) ? DUPLICATE_SLOT_COUNT : 1;
         for (let i = 1; i <= copyCount; i++) {
-            const slotName = copyCount === 2 ? `${position}${i}` : position;
+            const slotName = copyCount === DUPLICATE_SLOT_COUNT ? `${position}${i}` : position;
             slots.push({
                 position,
                 label: slotName,
@@ -485,10 +486,9 @@ function buildCharacterSlotPlan(equipmentByPosition) {
     return slots.sort((a, b) => {
         const aIndex = CHARACTER_SLOT_SIDE_ORDER.findIndex(([slotName]) => slotName === a.label);
         const bIndex = CHARACTER_SLOT_SIDE_ORDER.findIndex(([slotName]) => slotName === b.label);
-        const indexA = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
-        const indexB = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
-        if (indexA !== indexB) {
-            return indexA - indexB;
+        if (aIndex !== bIndex) {
+            return (aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex)
+                - (bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex);
         }
         return a.label.localeCompare(b.label, 'zh-Hant');
     });
