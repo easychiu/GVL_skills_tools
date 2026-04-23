@@ -233,6 +233,7 @@ class CharacterTab(ttk.Frame):
         self._auto_skill_cbs: List[ttk.Combobox] = []
         self._all_skills_sorted: List[str] = []
         self._skill_cap_var: tk.StringVar = tk.StringVar(value='25')
+        self._poor_var: tk.BooleanVar = tk.BooleanVar(value=False)
         self._build()
         self._load_options()
 
@@ -276,6 +277,9 @@ class CharacterTab(ttk.Frame):
         ttk.Label(auto_lf, text='技能上限：').pack(side='left', padx=(24, 2))
         ttk.Spinbox(auto_lf, textvariable=self._skill_cap_var,
                     from_=1, to=99, width=5).pack(side='left')
+
+        ttk.Checkbutton(auto_lf, text='我窮（排除質變裝備）',
+                        variable=self._poor_var).pack(side='left', padx=(16, 0))
 
         # 中央：左欄 + 右欄 + 結果面板
         main = tk.Frame(self, bg=APP_BG)
@@ -468,6 +472,7 @@ class CharacterTab(ttk.Frame):
             plans = self.handler.suggest_builds(
                 profession, priority_skills, is_sailor=is_sailor,
                 top_n=5, skill_cap=skill_cap,
+                exclude_quality=self._poor_var.get(),
             )
         except Exception as exc:
             messagebox.showerror('錯誤', str(exc))

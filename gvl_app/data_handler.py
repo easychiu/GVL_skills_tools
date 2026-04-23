@@ -395,6 +395,7 @@ class GVLDataHandler:
         top_n: int = 5,
         candidates_per_slot: int = 3,
         skill_cap: int = 25,
+        exclude_quality: bool = False,
     ) -> List[Dict[str, Any]]:
         """根據優先技能搜尋最佳 Top-N 配裝方案。
 
@@ -409,6 +410,7 @@ class GVLDataHandler:
             top_n: 回傳方案數量
             candidates_per_slot: 每個槽位保留的候選裝備數（影響計算速度與品質）
             skill_cap: 單一技能加成上限（超過此值的方案將被過濾，預設 25）
+            exclude_quality: 若為 True，排除名稱含「(質變)」的裝備
 
         Returns:
             方案列表，每筆包含：
@@ -436,9 +438,10 @@ class GVLDataHandler:
         # 建立各位置裝備清單
         eq_by_pos: Dict[str, List[dict]] = {}
         for pos in sorted(self.positions):
-            eq_by_pos[pos] = sorted(
-                self.get_equipment_by_position(pos), key=lambda e: e['name']
-            )
+            eq_list = self.get_equipment_by_position(pos)
+            if exclude_quality:
+                eq_list = [e for e in eq_list if '(質變)' not in e['name']]
+            eq_by_pos[pos] = sorted(eq_list, key=lambda e: e['name'])
 
         # 展開雙槽位（飾品/寶物各兩個）
         slots: List[Dict[str, Any]] = []
