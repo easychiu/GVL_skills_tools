@@ -55,6 +55,13 @@ python main.py cli search --name "戒指"
 python main.py cli search --skill "炮術" --min-level 2
 ```
 
+## 🌐 提供外部網頁工具讀取（API）
+
+- 角色即時計算：`POST /api/character/calculate`
+- GUI 自動配裝：`POST /api/character/suggest-builds`
+- API 端點已支援 CORS，可由外部網頁直接呼叫
+- 可用環境變數 `GVL_API_ALLOW_ORIGIN` 指定允許來源（預設 `*`）
+
 ## 📊 資料規模
 
 - **總裝備數**: 56 件

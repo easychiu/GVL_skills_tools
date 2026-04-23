@@ -70,4 +70,24 @@ print(f"職業: {data['profession']}")
 print(f"最高技能數: {len(data['highest_skills'])}")
 print()
 
+# 測試自動配裝 API
+print("測試 /api/character/suggest-builds:")
+response = client.post(
+    '/api/character/suggest-builds',
+    json={
+        'profession': '大提督',
+        'priority_skills': ['砲術', '彈道學'],
+        'is_sailor': True,
+        'top_n': 2,
+        'candidates_per_slot': 2,
+        'skill_cap': 25
+    }
+)
+print(f"狀態碼: {response.status_code}")
+data = response.get_json()
+print(f"方案數: {data['count']}")
+if data['plans']:
+    print(f"第一套裝備數: {len(data['plans'][0]['equipment_names'])}")
+print()
+
 print("✅ 所有 API 測試完成！")
