@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GVL 裝備表</title>
+    <link rel="stylesheet" href="{{ url_for('serve_static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- 標題 -->
+        <div class="header">
+            <h1>⚔️ GVL 裝備表系統</h1>
+            <p class="subtitle">大航海時代遊戲裝備配置工具</p>
+        </div>
+
+        <!-- 導航標籤 -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="search">搜索</button>
+            <button class="tab-btn" data-tab="equipment">裝備</button>
+            <button class="tab-btn" data-tab="config">配置</button>
+            <button class="tab-btn" data-tab="stats">統計</button>
+        </div>
+
+        <!-- 搜索頁面 -->
+        <div id="search" class="tab-content active">
+            <h2>搜索裝備</h2>
+            
+            <div class="search-section">
+                <h3>按名稱搜索</h3>
+                <div class="search-form">
+                    <input type="text" id="searchName" placeholder="輸入裝備名稱..." class="search-input">
+                    <button onclick="searchByName()" class="btn btn-primary">搜索</button>
+                </div>
+            </div>
+
+            <div class="search-section">
+                <h3>按技能搜索</h3>
+                <div class="search-form">
+                    <select id="skillSelect" class="search-input">
+                        <option value="">選擇技能...</option>
+                    </select>
+                    <input type="number" id="minLevel" placeholder="最小等級" value="1" class="search-input" min="1">
+                    <button onclick="searchBySkill()" class="btn btn-primary">搜索</button>
+                </div>
+            </div>
+
+            <div class="search-section">
+                <h3>按位置搜索</h3>
+                <div class="search-form">
+                    <select id="positionSelect" class="search-input">
+                        <option value="">選擇位置...</option>
+                    </select>
+                    <button onclick="searchByPosition()" class="btn btn-primary">搜索</button>
+                </div>
+            </div>
+
+            <div id="searchResults" class="results-container" style="display: none;">
+                <h3>搜索結果</h3>
+                <div id="resultsList"></div>
+            </div>
+        </div>
+
+        <!-- 裝備頁面 -->
+        <div id="equipment" class="tab-content">
+            <h2>所有裝備</h2>
+            <div class="info-bar">
+                <span id="equipmentCount">加載中...</span>
+            </div>
+            <div id="equipmentList" class="equipment-grid"></div>
+            <div class="pagination-controls">
+                <button onclick="previousPage()" class="btn">‹ 上一頁</button>
+                <span id="pageInfo"></span>
+                <button onclick="nextPage()" class="btn">下一頁 ›</button>
+            </div>
+        </div>
+
+        <!-- 配置頁面 -->
+        <div id="config" class="tab-content">
+            <h2>預設配置</h2>
+            <div class="config-buttons">
+                <button onclick="loadConfig('選單')" class="btn btn-secondary">查看：選單</button>
+                <button onclick="loadConfig('炮船範例')" class="btn btn-secondary">查看：炮船範例</button>
+            </div>
+            <div id="configContent" class="config-content" style="display: none;"></div>
+        </div>
+
+        <!-- 統計頁面 -->
+        <div id="stats" class="tab-content">
+            <h2>數據統計</h2>
+            <div id="statsContent" class="stats-content"></div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('serve_static', filename='script.js') }}"></script>
+</body>
+</html>
