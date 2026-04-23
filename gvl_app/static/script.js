@@ -484,10 +484,10 @@ function buildCharacterSlotPlan(equipmentByPosition) {
     return slots.sort((a, b) => {
         const aIndex = order.indexOf(a.label);
         const bIndex = order.indexOf(b.label);
-        const safeA = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
-        const safeB = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
-        if (safeA !== safeB) {
-            return safeA - safeB;
+        const sortIndexA = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
+        const sortIndexB = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
+        if (sortIndexA !== sortIndexB) {
+            return sortIndexA - sortIndexB;
         }
         return a.label.localeCompare(b.label, 'zh-Hant');
     });
