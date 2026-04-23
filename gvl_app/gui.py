@@ -261,7 +261,7 @@ class CharacterTab(ttk.Frame):
         auto_lf = ttk.LabelFrame(self, text='⚡ 自動配裝', padding=8)
         auto_lf.pack(fill='x', padx=10, pady=(0, 4))
 
-        for i in range(3):
+        for i in range(5):
             ttk.Label(auto_lf, text=f'優先 {i + 1}：').pack(
                 side='left', padx=(16 if i > 0 else 0, 2))
             var = tk.StringVar()
