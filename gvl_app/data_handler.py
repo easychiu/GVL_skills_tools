@@ -23,7 +23,7 @@ class GVLDataHandler:
         self.professions = {}
         self.skill_caps = {}
         self.sailor_skills = set()
-        # Excel 內含重複標題列（位置=位置），需與職業/角色上限一併排除
+        # 系統列標記：重複標題（位置=位置）與非裝備資料（職業、角色上限）皆需排除
         self.system_positions = {'位置', '職業', '角色上限'}
         self.load_data()
 
@@ -145,7 +145,7 @@ class GVLDataHandler:
         return professions
 
     def _sort_skill_map(self, skill_map: Dict[str, int]) -> Dict[str, int]:
-        """依照技能值降序、名稱升序排序技能映射"""
+        """排序技能映射：先按數值由大到小，同分時按技能名稱升序"""
         return dict(sorted(skill_map.items(), key=lambda item: (-item[1], item[0])))
 
     def _load_skill_caps_from_source(self) -> Dict[str, Dict[str, int]]:

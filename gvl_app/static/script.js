@@ -353,6 +353,13 @@ function renderSailorSkillsHint(sailorSkills) {
     hint.innerHTML = `<small>航海士可加成技能：${skillsText}</small>`;
 }
 
+/**
+ * 將技能映射轉為 HTML 標籤集合
+ * @param {Object<string, number>} skills 技能與數值映射
+ * @param {boolean} withPlus 是否以 +x 顯示數值
+ * @param {string} emptyText 空資料時顯示文字
+ * @returns {string} 技能 HTML 內容
+ */
 function renderSkillItems(skills, withPlus = false, emptyText = '無') {
     const entries = Object.entries(skills || {});
     if (!entries.length) {
