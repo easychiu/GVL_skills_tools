@@ -324,7 +324,10 @@ function loadCharacterOptions() {
         .catch(error => console.error('Error loading character options:', error));
 }
 
-// 顯示職業選項
+/**
+ * 顯示職業選項
+ * @param {Object<string, Object<string, number>>} professions 職業與技能加成映射
+ */
 function renderProfessionOptions(professions) {
     const select = document.getElementById('professionSelect');
     select.innerHTML = '';
@@ -337,7 +340,10 @@ function renderProfessionOptions(professions) {
     });
 }
 
-// 顯示配裝選單
+/**
+ * 顯示配裝選單
+ * @param {Object<string, string[]>} equipmentByPosition 位置與裝備名稱列表映射
+ */
 function renderCharacterEquipmentForm(equipmentByPosition) {
     const container = document.getElementById('characterEquipmentForm');
     container.innerHTML = '';
@@ -372,7 +378,9 @@ function renderCharacterEquipmentForm(equipmentByPosition) {
     });
 }
 
-// 計算角色技能
+/**
+ * 收集角色配裝資料並呼叫 API 計算技能
+ */
 function calculateCharacterSkills() {
     const profession = document.getElementById('professionSelect').value;
     const equipmentNames = [];
@@ -407,7 +415,10 @@ function calculateCharacterSkills() {
         });
 }
 
-// 顯示角色技能結果
+/**
+ * 顯示角色技能計算結果
+ * @param {Object} data 計算結果資料
+ */
 function displayCharacterResults(data) {
     const container = document.getElementById('characterResults');
     const content = document.getElementById('characterResultsContent');

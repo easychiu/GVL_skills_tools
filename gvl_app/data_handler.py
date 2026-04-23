@@ -186,7 +186,18 @@ class GVLDataHandler:
     def calculate_character_skills(
         self, profession: str, equipment_names: List[str]
     ) -> Dict[str, Any]:
-        """計算角色總技能（裝備 + 職業）"""
+        """計算角色總技能（裝備 + 職業）
+
+        Args:
+            profession: 職業名稱
+            equipment_names: 裝備名稱列表
+
+        Returns:
+            包含職業、已選裝備、裝備技能、職業加成與總技能的字典
+
+        Raises:
+            ValueError: 職業名稱不存在時拋出
+        """
         if profession not in self.professions:
             raise ValueError('不支持的職業')
 
