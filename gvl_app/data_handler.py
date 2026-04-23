@@ -516,11 +516,12 @@ class GVLDataHandler:
 
             # 各優先技能以 25 為上限評分（25 視為理想值）
             priority_score = tuple(
-                min(max(priority_values.get(skill, 0), 0), priority_target)
+                min(priority_values.get(skill, 0), priority_target)
                 for skill in p_skills
             )
+            priority_total = sum(priority_score)
             total_bonus = sum(skill_result.get('bonus_skills', {}).values())
-            score_key = priority_score + (sum(priority_score), total_bonus)
+            score_key = priority_score + (priority_total, total_bonus)
 
             results.append({
                 'equipment_names': eq_names,
