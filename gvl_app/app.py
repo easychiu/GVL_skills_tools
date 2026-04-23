@@ -8,6 +8,7 @@ from data_handler import GVLDataHandler
 # 初始化Flask應用
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
+API_CORS_ALLOW_ORIGIN = os.getenv('GVL_API_ALLOW_ORIGIN', '*')
 
 # 初始化數據處理器
 excel_path = Path(__file__).parent.parent / 'GVL裝備表.xlsx'
@@ -15,6 +16,18 @@ handler = GVLDataHandler(str(excel_path))
 
 # 獲取統計信息
 stats = handler.get_stats_summary()
+
+
+@app.after_request
+def add_api_cors_headers(response):
+    """為 API 路由加上跨域標頭，便於外部網頁工具讀取。"""
+    if request.path.startswith('/api/'):
+        response.headers['Access-Control-Allow-Origin'] = API_CORS_ALLOW_ORIGIN
+        response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        if API_CORS_ALLOW_ORIGIN != '*':
+            response.headers['Vary'] = 'Origin'
+    return response
 
 
 @app.route('/')
@@ -166,6 +179,63 @@ def api_character_calculate():
         return jsonify({'error': f'不支持的職業: {profession}'}), 400
 
     return jsonify(result)
+
+
+@app.route('/api/character/suggest-builds', methods=['POST'])
+def api_character_suggest_builds():
+    """自動配裝建議 API（GUI 自動配裝功能的 Web 版本）。"""
+    try:
+        payload = request.get_json()
+    except BadRequest:
+        return jsonify({'error': 'JSON 格式錯誤'}), 400
+
+    if payload is None:
+        payload = {}
+    if not isinstance(payload, dict):
+        return jsonify({'error': '請提供 JSON 物件'}), 400
+
+    profession = payload.get('profession', '通用')
+    priority_skills = payload.get('priority_skills', [])
+    is_sailor = bool(payload.get('is_sailor', False))
+    top_n = payload.get('top_n', 5)
+    candidates_per_slot = payload.get('candidates_per_slot', 3)
+    skill_cap = payload.get('skill_cap', 25)
+    exclude_quality = bool(payload.get('exclude_quality', False))
+
+    if not isinstance(priority_skills, list):
+        return jsonify({'error': 'priority_skills 必須為陣列'}), 400
+    if not priority_skills:
+        return jsonify({'error': 'priority_skills 不可為空'}), 400
+
+    try:
+        top_n = int(top_n)
+        candidates_per_slot = int(candidates_per_slot)
+        skill_cap = int(skill_cap)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'top_n、candidates_per_slot、skill_cap 必須為整數'}), 400
+
+    if top_n < 1 or candidates_per_slot < 1 or skill_cap < 0:
+        return jsonify({'error': 'top_n、candidates_per_slot 必須 >= 1，skill_cap 必須 >= 0'}), 400
+
+    try:
+        plans = handler.suggest_builds(
+            profession=profession,
+            priority_skills=priority_skills,
+            is_sailor=is_sailor,
+            top_n=top_n,
+            candidates_per_slot=candidates_per_slot,
+            skill_cap=skill_cap,
+            exclude_quality=exclude_quality,
+        )
+    except ValueError:
+        return jsonify({'error': f'不支持的職業: {profession}'}), 400
+
+    return jsonify({
+        'profession': profession,
+        'priority_skills': priority_skills,
+        'count': len(plans),
+        'plans': plans,
+    })
 
 
 @app.route('/api/config/<config_name>')
