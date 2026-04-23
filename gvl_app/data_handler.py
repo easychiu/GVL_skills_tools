@@ -400,8 +400,8 @@ class GVLDataHandler:
         """根據優先技能搜尋最佳 Top-N 配裝方案。
 
         算法：每個槽位保留 candidates_per_slot 件高分候選，枚舉所有組合後
-        依優先技能順序評分（最多 5 個），各技能數值越高且越接近 25 越優先，
-        同分時以整體加成總和作為次要排序，
+        依優先技能順序評分（最多 5 個），各技能以「接近 25」作為主要排序，
+        同分時再比較優先技能總值與整體加成總和，
         去重後回傳前 top_n 套。
 
         Args:
@@ -416,7 +416,9 @@ class GVLDataHandler:
         Returns:
             方案列表，每筆包含：
               - equipment_names: 裝備名稱清單
-              - score_key: 排序用分數 tuple (p1..pN, priority_total, total_bonus)
+              - score_key: 排序用分數 tuple
+                (p1..pN_closeness_to_25, priority_closeness_total,
+                 priority_raw_total, total_bonus)
               - priority_values: {技能名: 合計值} 字典
               - skill_result: 完整技能計算結果（同 calculate_character_skills 輸出）
 
@@ -431,7 +433,11 @@ class GVLDataHandler:
         # 只保留有效且不重複技能（最多 5 個，保留輸入順序）
         p_skills: List[str] = []
         for skill in priority_skills:
-            if not skill or skill not in self.skills or skill in p_skills:
+            if not skill:
+                continue
+            if skill not in self.skills:
+                continue
+            if skill in p_skills:
                 continue
             p_skills.append(skill)
             if len(p_skills) >= 5:
@@ -462,7 +468,7 @@ class GVLDataHandler:
         slots.sort(key=lambda s: order_map.get(s['label'], 999))
 
         def _score(eq: dict) -> tuple:
-            """裝備優先技能評分 tuple：(p1..pN, total_bonus)"""
+            """裝備優先技能評分 tuple：(p1..pN, 單件裝備總加成)"""
             sk = eq.get('skills', {})
             pvals = tuple(sk.get(s, 0) for s in p_skills)
             return pvals + (sum(sk.values()),)
@@ -496,7 +502,7 @@ class GVLDataHandler:
             seen_combo_sig.add(sig)
             unique_combos.append(eq_names)
 
-        # 依最終結果評分：優先技能越高且越接近 25 越前，同分看總加成
+        # 依最終結果評分：優先技能越接近 25 越前，同分看總值與總加成
         priority_target = 25
         results: List[Dict[str, Any]] = []
         for eq_names in unique_combos:
@@ -514,14 +520,15 @@ class GVLDataHandler:
             bonus_skills = skill_result.get('bonus_skills', {})
             priority_values = {skill: bonus_skills.get(skill, 0) for skill in p_skills}
 
-            # 各優先技能以 25 為上限評分（25 視為理想值）
+            # 各優先技能以 25 為理想值：越接近 25 分數越高
             priority_score = tuple(
-                min(priority_values.get(skill, 0), priority_target)
+                priority_target - abs(priority_values.get(skill, 0) - priority_target)
                 for skill in p_skills
             )
             priority_total = sum(priority_score)
+            priority_raw_total = sum(priority_values.values())
             total_bonus = sum(skill_result.get('bonus_skills', {}).values())
-            score_key = priority_score + (priority_total, total_bonus)
+            score_key = priority_score + (priority_total, priority_raw_total, total_bonus)
 
             results.append({
                 'equipment_names': eq_names,
