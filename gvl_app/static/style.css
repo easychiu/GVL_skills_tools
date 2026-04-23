@@ -629,8 +629,180 @@ select.slot-boarding {
     }
 }
 
-/* 加載狀態 */
-.loading {
+/* 技能結果表格（圖形化分欄）*/
+.skill-result-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92em;
+    margin-top: 10px;
+}
+
+.skill-result-table th {
+    background: #3a5caa;
+    color: white;
+    padding: 8px 10px;
+    text-align: center;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.skill-result-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid #e8edf7;
+    text-align: center;
+}
+
+.skill-result-table tbody tr:hover {
+    background: #f0f5ff;
+}
+
+.skill-name-cell {
+    text-align: left !important;
+    font-weight: 600;
+    min-width: 60px;
+}
+
+.skill-table-zero {
+    color: #c0c0c0;
+}
+
+/* 砲術 / 白兵 行底色 */
+.skill-row-cannon {
+    background: #eef6ff;
+}
+
+.skill-row-cannon:hover {
+    background: #d6eaff !important;
+}
+
+.skill-row-boarding {
+    background: #edfaf2;
+}
+
+.skill-row-boarding:hover {
+    background: #c8f0d8 !important;
+}
+
+/* 進度條欄 */
+.skill-bar-cell {
+    min-width: 140px;
+    padding: 6px 10px !important;
+}
+
+.skill-bar-wrap {
+    position: relative;
+    height: 22px;
+    background: #eaeaea;
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+}
+
+.skill-bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+
+.skill-bar-cannon  { background: linear-gradient(90deg, #4f98e0, #1d6bcc); }
+.skill-bar-boarding { background: linear-gradient(90deg, #4ec68a, #1e8a56); }
+.skill-bar-neutral  { background: linear-gradient(90deg, #a07de0, #6b3db8); }
+
+.skill-bar-label {
+    position: relative;
+    z-index: 1;
+    font-weight: 700;
+    font-size: 0.88em;
+    color: #1a1a1a;
+    padding-left: 6px;
+}
+
+/* 技能圖例 */
+.skill-legend {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 8px;
+    font-size: 0.85em;
+}
+
+.skill-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+/* 角色摘要列 */
+.char-info-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.char-info-label {
+    color: #555;
+    font-size: 0.9em;
+}
+
+.char-info-val {
+    font-weight: 700;
+    color: #2a4a8a;
+}
+
+.sailor-on {
+    color: #1e8a56;
+}
+
+.char-selected-label {
+    margin-bottom: 4px;
+    color: #333;
+    font-size: 0.9em;
+}
+
+.char-selected-list {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.char-selected-list li {
+    background: #e8f0ff;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 0.88em;
+    color: #2a4a8a;
+}
+
+.skill-result-pos {
+    display: inline-block;
+    background: #667eea;
+    color: white;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.82em;
+    margin-right: 5px;
+}
+
+/* 響應式：小螢幕隱藏加成小計 / 上限欄 */
+@media (max-width: 600px) {
+    .skill-result-table th:nth-child(5),
+    .skill-result-table td:nth-child(5),
+    .skill-result-table th:nth-child(6),
+    .skill-result-table td:nth-child(6) {
+        display: none;
+    }
+}
     text-align: center;
     color: #999;
     padding: 20px;

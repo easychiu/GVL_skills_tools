@@ -605,7 +605,7 @@ function calculateCharacterSkills() {
 }
 
 /**
- * 顯示角色技能計算結果
+ * 顯示角色技能計算結果（圖形化分欄表格 + 進度條）
  * @param {Object} data 計算結果資料
  */
 function displayCharacterResults(data) {
@@ -613,27 +613,109 @@ function displayCharacterResults(data) {
     const content = document.getElementById('characterResultsContent');
     const wasHidden = container.style.display === 'none';
 
-    const highestSkillsHtml = renderSkillItems(data.highest_skills, false, '目前沒有技能加成');
-
+    // ── 已選裝備摘要 ──────────────────────────────────────────────────────
     const selectedEquipmentHtml = data.selected_equipment
-        .map(eq => `<li>${escapeHtml(eq.position)}：${escapeHtml(eq.name)}</li>`)
+        .map(eq => `<li><span class="skill-result-pos">${escapeHtml(eq.position)}</span>${escapeHtml(eq.name)}</li>`)
         .join('') || '<li>尚未選擇裝備</li>';
 
     const invalidEquipmentHtml = (data.invalid_equipment || [])
         .map(name => `<li>${escapeHtml(name)}</li>`)
         .join('');
 
+    // ── 收集所有有值的技能 ────────────────────────────────────────────────
+    const allSkills = Array.from(new Set([
+        ...Object.keys(data.equipment_skills || {}),
+        ...Object.keys(data.profession_bonus || {}),
+        ...Object.keys(data.sailor_bonus || {}),
+        ...Object.keys(data.skill_caps || {}),
+        ...Object.keys(data.highest_skills || {})
+    ])).filter(s => (data.highest_skills || {})[s] > 0 || (data.skill_caps || {})[s] > 0)
+       .sort((a, b) => ((data.highest_skills || {})[b] || 0) - ((data.highest_skills || {})[a] || 0) || a.localeCompare(b, 'zh-Hant'));
+
+    // ── 最高值的最大值（用於進度條寬度計算）────────────────────────────
+    const maxHighest = Math.max(1, ...allSkills.map(s => (data.highest_skills || {})[s] || 0));
+
+    // ── 技能分類（砲術 / 白兵 / 其他）────────────────────────────────────
+    function skillCategory(skill) {
+        if (CANNON_SKILLS.has(skill)) return 'cannon';
+        if (BOARDING_SKILLS.has(skill)) return 'boarding';
+        return '';
+    }
+
+    function cell(val) {
+        if (!val) return '<td class="skill-table-zero">-</td>';
+        return `<td>${escapeHtml(String(val))}</td>`;
+    }
+
+    // ── 生成表格行 ────────────────────────────────────────────────────────
+    const rows = allSkills.map(skill => {
+        const eq     = (data.equipment_skills  || {})[skill] || 0;
+        const prof   = (data.profession_bonus  || {})[skill] || 0;
+        const sailor = (data.sailor_bonus      || {})[skill] || 0;
+        const bonus  = (data.bonus_skills      || {})[skill] || 0;
+        const cap    = (data.skill_caps        || {})[skill] || 0;
+        const high   = (data.highest_skills   || {})[skill] || 0;
+
+        const cat    = skillCategory(skill);
+        const rowCls = cat ? ` class="skill-row-${cat}"` : '';
+        const pct    = Math.round((high / maxHighest) * 100);
+
+        const barHtml = `
+            <td class="skill-bar-cell">
+                <div class="skill-bar-wrap">
+                    <div class="skill-bar skill-bar-${cat || 'neutral'}" style="width:${pct}%"></div>
+                    <span class="skill-bar-label">${escapeHtml(String(high))}</span>
+                </div>
+            </td>`;
+
+        return `<tr${rowCls}>
+            <td class="skill-name-cell">${escapeHtml(skill)}</td>
+            ${cell(eq || 0)}
+            ${cell(prof || 0)}
+            ${cell(sailor || 0)}
+            ${cell(bonus || 0)}
+            ${cell(cap || 0)}
+            ${barHtml}
+        </tr>`;
+    }).join('');
+
+    const tableHtml = allSkills.length
+        ? `<table class="skill-result-table">
+            <thead>
+                <tr>
+                    <th>技能</th>
+                    <th title="裝備加成">裝備</th>
+                    <th title="職業加成">職業</th>
+                    <th title="航海士加成">航海士</th>
+                    <th title="加成小計">加成</th>
+                    <th title="角色上限">上限</th>
+                    <th title="角色上限 + 加成小計">最高值</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+           </table>`
+        : '<p>（目前沒有技能加成）</p>';
+
+    // ── 組合最終 HTML ─────────────────────────────────────────────────────
     content.innerHTML = `
         <div class="character-summary">
-            <div><strong>職業：</strong>${escapeHtml(data.profession)}</div>
-            <div><strong>航海士：</strong>${data.is_sailor ? '是' : '否'}</div>
-            <div><strong>已選裝備：</strong></div>
-            <ul>${selectedEquipmentHtml}</ul>
-            ${invalidEquipmentHtml ? `<div><strong>未找到裝備：</strong><ul>${invalidEquipmentHtml}</ul></div>` : ''}
+            <div class="char-info-row">
+                <span class="char-info-label">職業</span>
+                <span class="char-info-val">${escapeHtml(data.profession)}</span>
+                <span class="char-info-label">航海士</span>
+                <span class="char-info-val ${data.is_sailor ? 'sailor-on' : ''}">${data.is_sailor ? '✔ 是' : '否'}</span>
+            </div>
+            <div class="char-selected-label"><strong>已選裝備：</strong></div>
+            <ul class="char-selected-list">${selectedEquipmentHtml}</ul>
+            ${invalidEquipmentHtml ? `<div class="error">未找到裝備：<ul>${invalidEquipmentHtml}</ul></div>` : ''}
         </div>
         <div class="character-skills-block">
-            <h4>最高技能（角色上限 + 職業 + 裝備 + 航海士）</h4>
-            <div>${highestSkillsHtml}</div>
+            <h4>技能分解總覽</h4>
+            <div class="skill-legend">
+                <span class="skill-legend-item legend-cannon">■ 砲術系</span>
+                <span class="skill-legend-item legend-boarding">■ 白兵系</span>
+            </div>
+            ${tableHtml}
         </div>
     `;
 
