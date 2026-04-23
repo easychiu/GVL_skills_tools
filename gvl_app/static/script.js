@@ -43,6 +43,7 @@ function classifyEquipment(name) {
         if (CANNON_SKILLS.has(skill)) cannonScore += level;
         if (BOARDING_SKILLS.has(skill)) boardingScore += level;
     }
+    // 砲術系分數 >= 白兵系分數時（含平手）優先歸類為砲術系
     if (cannonScore > 0 && cannonScore >= boardingScore) return 'cannon';
     if (boardingScore > 0 && boardingScore > cannonScore) return 'boarding';
     return 'neutral';
