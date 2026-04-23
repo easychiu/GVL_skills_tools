@@ -79,32 +79,48 @@
         <!-- 角色頁面 -->
         <div id="character" class="tab-content">
             <h2>角色配裝</h2>
-            <div class="search-section">
-                <h3>角色職業</h3>
-                <div class="search-form">
-                    <select id="professionSelect" class="search-input">
-                        <option value="通用">通用</option>
-                    </select>
+            <div class="character-main-layout">
+                <div class="character-stage-card">
+                    <div class="character-controls">
+                        <div class="character-control-item">
+                            <label class="character-control-label" for="professionSelect">職業</label>
+                            <select id="professionSelect" class="search-input">
+                                <option value="通用">通用</option>
+                            </select>
+                        </div>
+                        <div class="character-control-item">
+                            <label class="character-control-label">
+                                <input type="checkbox" id="sailorCheckbox">
+                                航海士（選單航海士技能 +1）
+                            </label>
+                            <div id="sailorSkillsHint" class="character-hint"></div>
+                        </div>
+                    </div>
+
+                    <div id="characterEquipmentForm" class="character-stage-inner">
+                        <div id="characterLeftSlots" class="character-slot-column character-slot-column-left"></div>
+                        <div class="character-avatar-panel">
+                            <div class="slot-color-legend">
+                                <span class="legend-item legend-cannon">■ 藍色：砲術系（砲術／水平／彈道／貫穿／速射）</span>
+                                <span class="legend-item legend-boarding">■ 綠色：白兵(跳幫)系（突擊／戰術／射擊）</span>
+                            </div>
+                            <div class="character-avatar-figure">
+                                <div class="character-avatar-title">角色</div>
+                                <div class="character-avatar-subtitle">依照參考圖配置左右裝備欄位</div>
+                            </div>
+                        </div>
+                        <div id="characterRightSlots" class="character-slot-column character-slot-column-right"></div>
+                    </div>
+
+                    <button onclick="calculateCharacterSkills()" class="btn btn-primary character-calc-btn">計算角色技能</button>
                 </div>
-            </div>
-            <div class="search-section">
-                <h3>裝備配置</h3>
-                <div id="characterEquipmentForm" class="character-grid"></div>
-            </div>
-            <div class="search-section">
-                <h3>額外設定</h3>
-                <div class="search-form">
-                    <label>
-                        <input type="checkbox" id="sailorCheckbox">
-                        航海士（選單航海士技能 +1）
-                    </label>
+
+                <div class="character-results-card">
+                    <h3>角色技能結果</h3>
+                    <div id="characterResults" class="results-container character-results-panel" style="display: none;">
+                        <div id="characterResultsContent"></div>
+                    </div>
                 </div>
-                <div id="sailorSkillsHint"></div>
-            </div>
-            <button onclick="calculateCharacterSkills()" class="btn btn-primary">計算角色技能</button>
-            <div id="characterResults" class="results-container" style="display: none;">
-                <h3>角色技能結果</h3>
-                <div id="characterResultsContent"></div>
             </div>
         </div>
 

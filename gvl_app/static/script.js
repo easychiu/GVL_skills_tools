@@ -5,8 +5,63 @@ let state = {
     currentPage: 1,
     perPage: 20,
     totalPages: 1,
-    characterOptions: null
+    characterOptions: null,
+    equipmentSkillsMap: {}
 };
+
+const CHARACTER_SLOT_SIDE_ORDER = [
+    ['飾品1', 'left'],
+    ['飾品2', 'left'],
+    ['寶物1', 'left'],
+    ['寶物2', 'left'],
+    ['主武', 'left'],
+    ['副武', 'left'],
+    ['頭盔', 'right'],
+    ['衣服', 'right'],
+    ['手套', 'right'],
+    ['鞋子', 'right']
+];
+const CHARACTER_SLOT_SIDE_MAP = Object.fromEntries(CHARACTER_SLOT_SIDE_ORDER);
+const CHARACTER_DUPLICATE_POSITIONS = new Set(['飾品', '寶物']);
+const DEFAULT_SLOT_SIDE = 'right';
+const DUPLICATE_SLOT_COUNT = 2;
+
+// 裝備類型判斷：砲術系 vs 白兵(跳幫)系
+const CANNON_SKILLS = new Set(['砲術', '水平', '彈道', '貫穿', '速射']);
+const BOARDING_SKILLS = new Set(['突擊', '戰術', '射擊']);
+
+/**
+ * 依技能判斷裝備類型：cannon（砲術系）、boarding（白兵系）或 neutral
+ * @param {string} name 裝備名稱
+ * @returns {'cannon'|'boarding'|'neutral'}
+ */
+function classifyEquipment(name) {
+    const skills = state.equipmentSkillsMap[name] || {};
+    let cannonScore = 0;
+    let boardingScore = 0;
+    for (const [skill, level] of Object.entries(skills)) {
+        if (CANNON_SKILLS.has(skill)) cannonScore += level;
+        if (BOARDING_SKILLS.has(skill)) boardingScore += level;
+    }
+    // 砲術系分數 >= 白兵系分數時（含平手）優先歸類為砲術系
+    if (cannonScore > 0 && cannonScore >= boardingScore) return 'cannon';
+    if (boardingScore > 0 && boardingScore > cannonScore) return 'boarding';
+    return 'neutral';
+}
+
+/**
+ * 依裝備類型更新選單底色
+ * @param {HTMLSelectElement} selectEl
+ */
+function updateSlotColor(selectEl) {
+    const type = selectEl.value ? classifyEquipment(selectEl.value) : 'neutral';
+    selectEl.classList.remove('slot-cannon', 'slot-boarding');
+    if (type === 'cannon') {
+        selectEl.classList.add('slot-cannon');
+    } else if (type === 'boarding') {
+        selectEl.classList.add('slot-boarding');
+    }
+}
 
 function escapeHtml(value) {
     return String(value)
@@ -327,6 +382,7 @@ function loadCharacterOptions() {
         .then(response => response.json())
         .then(data => {
             state.characterOptions = data;
+            state.equipmentSkillsMap = data.equipment_skills_map || {};
             renderProfessionOptions(data.professions);
             renderCharacterEquipmentForm(data.equipment_by_position);
             renderSailorSkillsHint(data.sailor_skills || []);
@@ -370,7 +426,8 @@ function renderSkillItems(skills, withPlus = false, emptyText = '無') {
             const valueText = withPlus
                 ? `+${escapeHtml(level)}`
                 : `${escapeHtml(level)}`;
-            return `<span class="skill-item">${escapeHtml(skill)}(${valueText})</span>`;
+            const highClass = level >= 25 ? ' skill-item--high' : '';
+            return `<span class="skill-item${highClass}">${escapeHtml(skill)}(${valueText})</span>`;
         })
         .join('');
 }
@@ -396,36 +453,115 @@ function renderProfessionOptions(professions) {
  * @param {Object<string, string[]>} equipmentByPosition 位置與裝備名稱列表映射
  */
 function renderCharacterEquipmentForm(equipmentByPosition) {
-    const container = document.getElementById('characterEquipmentForm');
-    container.innerHTML = '';
+    const leftColumn = document.getElementById('characterLeftSlots');
+    const rightColumn = document.getElementById('characterRightSlots');
 
-    Object.entries(equipmentByPosition).forEach(([position, equipmentNames]) => {
+    if (!leftColumn || !rightColumn) {
+        return;
+    }
+
+    leftColumn.innerHTML = '';
+    rightColumn.innerHTML = '';
+
+    const slotPlan = buildCharacterSlotPlan(equipmentByPosition);
+
+    slotPlan.forEach(slot => {
         const group = document.createElement('div');
-        group.className = 'character-field';
+        group.className = 'character-slot';
 
         const label = document.createElement('label');
-        label.className = 'character-field-label';
-        label.textContent = position;
+        label.className = 'character-slot-label';
+        label.textContent = slot.label;
 
         const select = document.createElement('select');
         select.className = 'search-input';
-        select.dataset.position = position;
+        select.dataset.position = slot.position;
 
         const emptyOption = document.createElement('option');
         emptyOption.value = '';
         emptyOption.textContent = '不裝備';
         select.appendChild(emptyOption);
 
-        equipmentNames.forEach(name => {
+        slot.equipmentNames.forEach(name => {
             const option = document.createElement('option');
             option.value = name;
-            option.textContent = name;
+            const skills = state.equipmentSkillsMap[name] || {};
+            const skillStr = Object.entries(skills)
+                .filter(([, v]) => v)
+                .map(([k, v]) => `${k}+${v}`)
+                .join(' ');
+            option.textContent = skillStr ? `${name} [${skillStr}]` : name;
             select.appendChild(option);
         });
 
         group.appendChild(label);
         group.appendChild(select);
-        container.appendChild(group);
+
+        if (slot.side === 'right') {
+            rightColumn.appendChild(group);
+            return;
+        }
+        leftColumn.appendChild(group);
+    });
+
+    setupCharacterAutoCalculate();
+}
+
+/**
+ * 為職業選單、航海士勾選框與所有裝備下拉選單綁定 change 事件，
+ * 讓技能結果在選項變更時即時重新計算。
+ */
+function setupCharacterAutoCalculate() {
+    document.querySelectorAll('#characterEquipmentForm select').forEach(select => {
+        select.addEventListener('change', () => {
+            updateSlotColor(select);
+            calculateCharacterSkills();
+        });
+        updateSlotColor(select);
+    });
+
+    const professionSelect = document.getElementById('professionSelect');
+    if (professionSelect) {
+        professionSelect.addEventListener('change', calculateCharacterSkills);
+    }
+
+    const sailorCheckbox = document.getElementById('sailorCheckbox');
+    if (sailorCheckbox) {
+        sailorCheckbox.addEventListener('change', calculateCharacterSkills);
+    }
+}
+
+/**
+ * 建立角色配裝欄位配置，讓版面接近建議 UI 圖
+ * @param {Object<string, string[]>} equipmentByPosition 位置與裝備名稱列表
+ * @returns {Array<{position: string, label: string, equipmentNames: string[], side: string}>}
+ */
+function buildCharacterSlotPlan(equipmentByPosition) {
+    const slots = [];
+
+    Object.entries(equipmentByPosition).forEach(([position, equipmentNames]) => {
+        const copyCount = CHARACTER_DUPLICATE_POSITIONS.has(position) ? DUPLICATE_SLOT_COUNT : 1;
+        for (let i = 1; i <= copyCount; i++) {
+            const slotName = copyCount > 1 ? `${position}${i}` : position;
+            slots.push({
+                position,
+                label: slotName,
+                equipmentNames: equipmentNames || [],
+                side: CHARACTER_SLOT_SIDE_MAP[slotName]
+                    || CHARACTER_SLOT_SIDE_MAP[position]
+                    || DEFAULT_SLOT_SIDE
+            });
+        }
+    });
+
+    return slots.sort((a, b) => {
+        const aIndex = CHARACTER_SLOT_SIDE_ORDER.findIndex(([slotName]) => slotName === a.label);
+        const bIndex = CHARACTER_SLOT_SIDE_ORDER.findIndex(([slotName]) => slotName === b.label);
+        if (aIndex !== bIndex) {
+            return (aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex)
+                - (bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex);
+        }
+        return a.label.localeCompare(b.label, 'zh-Hant');
     });
 }
 
@@ -469,59 +605,124 @@ function calculateCharacterSkills() {
 }
 
 /**
- * 顯示角色技能計算結果
+ * 顯示角色技能計算結果（圖形化分欄表格 + 進度條）
  * @param {Object} data 計算結果資料
  */
 function displayCharacterResults(data) {
     const container = document.getElementById('characterResults');
     const content = document.getElementById('characterResultsContent');
+    const wasHidden = container.style.display === 'none';
 
-    const skillCapsHtml = renderSkillItems(data.skill_caps, false, '未設定角色技能上限');
-    const equipmentBonusHtml = renderSkillItems(data.equipment_skills, true, '目前沒有裝備技能加成');
-    const professionBonusHtml = renderSkillItems(data.profession_bonus, true, '此職業無額外技能加成');
-    const sailorBonusHtml = renderSkillItems(data.sailor_bonus, true, '未啟用航海士加成');
-    const highestSkillsHtml = renderSkillItems(data.highest_skills, false, '目前沒有技能加成');
-
+    // ── 已選裝備摘要 ──────────────────────────────────────────────────────
     const selectedEquipmentHtml = data.selected_equipment
-        .map(eq => `<li>${escapeHtml(eq.position)}：${escapeHtml(eq.name)}</li>`)
+        .map(eq => `<li><span class="skill-result-pos">${escapeHtml(eq.position)}</span>${escapeHtml(eq.name)}</li>`)
         .join('') || '<li>尚未選擇裝備</li>';
 
     const invalidEquipmentHtml = (data.invalid_equipment || [])
         .map(name => `<li>${escapeHtml(name)}</li>`)
         .join('');
 
+    // ── 收集所有有值的技能 ────────────────────────────────────────────────
+    const allSkills = Array.from(new Set([
+        ...Object.keys(data.equipment_skills || {}),
+        ...Object.keys(data.profession_bonus || {}),
+        ...Object.keys(data.sailor_bonus || {}),
+        ...Object.keys(data.skill_caps || {}),
+        ...Object.keys(data.highest_skills || {})
+    ])).filter(s => (data.highest_skills || {})[s] > 0 || (data.skill_caps || {})[s] > 0)
+       .sort((a, b) => ((data.highest_skills || {})[b] || 0) - ((data.highest_skills || {})[a] || 0) || a.localeCompare(b, 'zh-Hant'));
+
+    // ── 最高值的最大值（用於進度條寬度計算）────────────────────────────
+    const maxHighest = Math.max(1, ...allSkills.map(s => (data.highest_skills || {})[s] || 0));
+
+    // ── 技能分類（砲術 / 白兵 / 其他）────────────────────────────────────
+    function skillCategory(skill) {
+        if (CANNON_SKILLS.has(skill)) return 'cannon';
+        if (BOARDING_SKILLS.has(skill)) return 'boarding';
+        return '';
+    }
+
+    function cell(val) {
+        if (!val) return '<td class="skill-table-zero">-</td>';
+        return `<td>${escapeHtml(String(val))}</td>`;
+    }
+
+    // ── 生成表格行 ────────────────────────────────────────────────────────
+    const rows = allSkills.map(skill => {
+        const eq     = (data.equipment_skills  || {})[skill] || 0;
+        const prof   = (data.profession_bonus  || {})[skill] || 0;
+        const sailor = (data.sailor_bonus      || {})[skill] || 0;
+        const bonus  = (data.bonus_skills      || {})[skill] || 0;
+        const cap    = (data.skill_caps        || {})[skill] || 0;
+        const high   = (data.highest_skills   || {})[skill] || 0;
+
+        const cat    = skillCategory(skill);
+        const rowCls = cat ? ` class="skill-row-${cat}"` : '';
+        const pct    = Math.round((high / maxHighest) * 100);
+
+        const barHtml = `
+            <td class="skill-bar-cell">
+                <div class="skill-bar-wrap">
+                    <div class="skill-bar skill-bar-${cat || 'neutral'}" style="width:${pct}%"></div>
+                    <span class="skill-bar-label">${escapeHtml(String(high))}</span>
+                </div>
+            </td>`;
+
+        return `<tr${rowCls}>
+            <td class="skill-name-cell">${escapeHtml(skill)}</td>
+            ${cell(eq || 0)}
+            ${cell(prof || 0)}
+            ${cell(sailor || 0)}
+            ${cell(bonus || 0)}
+            ${cell(cap || 0)}
+            ${barHtml}
+        </tr>`;
+    }).join('');
+
+    const tableHtml = allSkills.length
+        ? `<table class="skill-result-table">
+            <thead>
+                <tr>
+                    <th>技能</th>
+                    <th title="裝備加成">裝備</th>
+                    <th title="職業加成">職業</th>
+                    <th title="航海士加成">航海士</th>
+                    <th title="加成小計">加成</th>
+                    <th title="角色上限">上限</th>
+                    <th title="角色上限 + 加成小計">最高值</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+           </table>`
+        : '<p>（目前沒有技能加成）</p>';
+
+    // ── 組合最終 HTML ─────────────────────────────────────────────────────
     content.innerHTML = `
         <div class="character-summary">
-            <div><strong>職業：</strong>${escapeHtml(data.profession)}</div>
-            <div><strong>航海士：</strong>${data.is_sailor ? '是' : '否'}</div>
-            <div><strong>已選裝備：</strong></div>
-            <ul>${selectedEquipmentHtml}</ul>
-            ${invalidEquipmentHtml ? `<div><strong>未找到裝備：</strong><ul>${invalidEquipmentHtml}</ul></div>` : ''}
+            <div class="char-info-row">
+                <span class="char-info-label">職業</span>
+                <span class="char-info-val">${escapeHtml(data.profession)}</span>
+                <span class="char-info-label">航海士</span>
+                <span class="char-info-val ${data.is_sailor ? 'sailor-on' : ''}">${data.is_sailor ? '✔ 是' : '否'}</span>
+            </div>
+            <div class="char-selected-label"><strong>已選裝備：</strong></div>
+            <ul class="char-selected-list">${selectedEquipmentHtml}</ul>
+            ${invalidEquipmentHtml ? `<div class="error">未找到裝備：<ul>${invalidEquipmentHtml}</ul></div>` : ''}
         </div>
         <div class="character-skills-block">
-            <h4>角色技能上限</h4>
-            <div>${skillCapsHtml}</div>
-        </div>
-        <div class="character-skills-block">
-            <h4>裝備技能加成（+x）</h4>
-            <div>${equipmentBonusHtml}</div>
-        </div>
-        <div class="character-skills-block">
-            <h4>職業技能加成</h4>
-            <div>${professionBonusHtml}</div>
-        </div>
-        <div class="character-skills-block">
-            <h4>航海士技能加成</h4>
-            <div>${sailorBonusHtml}</div>
-        </div>
-        <div class="character-skills-block">
-            <h4>最高技能（角色上限 + 職業 + 裝備 + 航海士）</h4>
-            <div>${highestSkillsHtml}</div>
+            <h4>技能分解總覽</h4>
+            <div class="skill-legend">
+                <span class="skill-legend-item legend-cannon">■ 砲術系</span>
+                <span class="skill-legend-item legend-boarding">■ 白兵系</span>
+            </div>
+            ${tableHtml}
         </div>
     `;
 
     container.style.display = 'block';
-    container.scrollIntoView({ behavior: 'smooth' });
+    if (wasHidden) {
+        container.scrollIntoView({ behavior: 'smooth' });
+    }
 }
 
 // 顯示統計信息
