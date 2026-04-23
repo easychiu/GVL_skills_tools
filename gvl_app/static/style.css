@@ -259,6 +259,12 @@ h3 {
     margin-top: 4px;
 }
 
+.skill-item--high {
+    background: #ffe566;
+    color: #7a5c00;
+    font-weight: 700;
+}
+
 /* 分頁控件 */
 .pagination-controls {
     text-align: center;

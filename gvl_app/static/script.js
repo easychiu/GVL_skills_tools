@@ -387,7 +387,8 @@ function renderSkillItems(skills, withPlus = false, emptyText = '無') {
             const valueText = withPlus
                 ? `+${escapeHtml(level)}`
                 : `${escapeHtml(level)}`;
-            return `<span class="skill-item">${escapeHtml(skill)}(${valueText})</span>`;
+            const highClass = level >= 25 ? ' skill-item--high' : '';
+            return `<span class="skill-item${highClass}">${escapeHtml(skill)}(${valueText})</span>`;
         })
         .join('');
 }
@@ -458,6 +459,30 @@ function renderCharacterEquipmentForm(equipmentByPosition) {
         }
         leftColumn.appendChild(group);
     });
+
+    setupCharacterAutoCalculate();
+}
+
+/**
+ * 為職業選單、航海士勾選框與所有裝備下拉選單綁定 change 事件，
+ * 讓技能結果在選項變更時即時重新計算。
+ */
+function setupCharacterAutoCalculate() {
+    document.querySelectorAll('#characterEquipmentForm select').forEach(select => {
+        select.addEventListener('change', calculateCharacterSkills);
+    });
+
+    const professionSelect = document.getElementById('professionSelect');
+    if (professionSelect) {
+        professionSelect.removeEventListener('change', calculateCharacterSkills);
+        professionSelect.addEventListener('change', calculateCharacterSkills);
+    }
+
+    const sailorCheckbox = document.getElementById('sailorCheckbox');
+    if (sailorCheckbox) {
+        sailorCheckbox.removeEventListener('change', calculateCharacterSkills);
+        sailorCheckbox.addEventListener('change', calculateCharacterSkills);
+    }
 }
 
 /**
@@ -540,6 +565,7 @@ function calculateCharacterSkills() {
 function displayCharacterResults(data) {
     const container = document.getElementById('characterResults');
     const content = document.getElementById('characterResultsContent');
+    const wasHidden = container.style.display === 'none';
 
     const skillCapsHtml = renderSkillItems(data.skill_caps, false, '未設定角色技能上限');
     const equipmentBonusHtml = renderSkillItems(data.equipment_skills, true, '目前沒有裝備技能加成');
@@ -586,7 +612,9 @@ function displayCharacterResults(data) {
     `;
 
     container.style.display = 'block';
-    container.scrollIntoView({ behavior: 'smooth' });
+    if (wasHidden) {
+        container.scrollIntoView({ behavior: 'smooth' });
+    }
 }
 
 // 顯示統計信息
