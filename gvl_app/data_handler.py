@@ -522,15 +522,17 @@ class GVLDataHandler:
 
             # 各優先技能以 25 為理想值：越接近 25 分數越高
             priority_score = tuple(
-                priority_target - abs(priority_values.get(skill, 0) - priority_target)
+                -abs(priority_values.get(skill, 0) - priority_target)
                 for skill in p_skills
             )
             priority_closeness_total = sum(priority_score)
             priority_raw_total = sum(priority_values.values())
-            total_bonus = sum(skill_result.get('bonus_skills', {}).values())
+            total_bonus = sum(bonus_skills.values())
             score_key = (
-                priority_score
-                + (priority_closeness_total, priority_raw_total, total_bonus)
+                *priority_score,
+                priority_closeness_total,
+                priority_raw_total,
+                total_bonus,
             )
 
             results.append({
