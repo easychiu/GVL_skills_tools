@@ -231,6 +231,7 @@ class CharacterTab(ttk.Frame):
         # auto-build priority skill controls
         self._auto_skill_vars: List[tk.StringVar] = []
         self._auto_skill_cbs: List[ttk.Combobox] = []
+        self._all_skills_sorted: List[str] = []
         self._build()
         self._load_options()
 
@@ -355,9 +356,10 @@ class CharacterTab(ttk.Frame):
                     self._on_slot_change(lbl, sv, sl, dm))
 
         # 初始化自動配裝技能下拉選單
-        all_skills_sorted = ['（不選）'] + sorted(self.handler.skills)
+        self._all_skills_sorted = sorted(self.handler.skills)
+        all_skills_dropdown = ['（不選）'] + self._all_skills_sorted
         for acb in self._auto_skill_cbs:
-            acb['values'] = all_skills_sorted
+            acb['values'] = all_skills_dropdown
             acb.current(0)
 
         self._on_change()
@@ -425,7 +427,7 @@ class CharacterTab(ttk.Frame):
 
     def _on_auto_skill_select(self, _event=None):
         """更新自動配裝技能下拉選單，防止重複選擇"""
-        all_skills = sorted(self.handler.skills)
+        all_skills = self._all_skills_sorted
         for i, (acb, var) in enumerate(zip(self._auto_skill_cbs, self._auto_skill_vars)):
             current = var.get()
             others_selected = {
@@ -476,6 +478,12 @@ class CharacterTab(ttk.Frame):
             if eq:
                 pos_to_names.setdefault(eq['position'], []).append(name)
 
+        # 預先建立各槽位的反向對應表（顯示文字 ← 真實名稱）
+        slot_inv_maps: Dict[str, Dict[str, str]] = {
+            slot_label: {v: k for k, v in dm.items()}
+            for slot_label, dm in self._slot_display_to_name.items()
+        }
+
         # 記錄每個位置已分配的索引
         pos_assigned: Dict[str, int] = {}
 
@@ -489,14 +497,13 @@ class CharacterTab(ttk.Frame):
                 pos_assigned[pos] = idx + 1
 
                 # 找出對應的顯示文字
-                display_map = self._slot_display_to_name.get(slot_label, {})
-                inv_map = {v: k for k, v in display_map.items()}
-                display = inv_map.get(real_name, '（不裝備）')
+                display = slot_inv_maps.get(slot_label, {}).get(real_name, '（不裝備）')
                 var.set(display)
 
                 # 更新技能提示標籤
                 skill_lbl = self._slot_skill_labels.get(slot_label)
                 if skill_lbl:
+                    display_map = self._slot_display_to_name.get(slot_label, {})
                     text = self._skills_detail_text(display, display_map, self.handler)
                     skill_lbl.config(text=text)
             else:

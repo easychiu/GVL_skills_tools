@@ -465,6 +465,15 @@ class GVLDataHandler:
             scored = sorted(eq_list, key=_score, reverse=True)
             slot_candidates.append(scored[:candidates_per_slot])
 
+        # 預先計算每件裝備的技能合計（避免在組合枚舉中重複 sum）
+        eq_total_cache: Dict[int, int] = {}
+        for cands in slot_candidates:
+            for eq in cands:
+                if eq is not None:
+                    eid = id(eq)
+                    if eid not in eq_total_cache:
+                        eq_total_cache[eid] = sum(eq.get('skills', {}).values())
+
         # 枚舉所有組合並計算分數
         scored_combos: List[tuple] = []
         for combo in iterproduct(*slot_candidates):
@@ -477,7 +486,7 @@ class GVLDataHandler:
                 sk = eq.get('skills', {})
                 for i, ps in enumerate(p_skills):
                     pvals[i] += sk.get(ps, 0)
-                total_bonus += sum(sk.values())
+                total_bonus += eq_total_cache[id(eq)]
                 eq_names.append(eq['name'])
             score_key = tuple(pvals) + (total_bonus,)
             scored_combos.append((score_key, eq_names))
