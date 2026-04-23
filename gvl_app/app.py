@@ -155,7 +155,7 @@ def api_character_calculate():
     try:
         result = handler.calculate_character_skills(profession, equipment_names)
     except ValueError:
-        return jsonify({'error': '不支持的職業'}), 400
+        return jsonify({'error': f'不支持的職業: {profession}'}), 400
 
     return jsonify(result)
 
