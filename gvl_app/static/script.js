@@ -396,27 +396,36 @@ function renderProfessionOptions(professions) {
  * @param {Object<string, string[]>} equipmentByPosition 位置與裝備名稱列表映射
  */
 function renderCharacterEquipmentForm(equipmentByPosition) {
-    const container = document.getElementById('characterEquipmentForm');
-    container.innerHTML = '';
+    const leftColumn = document.getElementById('characterLeftSlots');
+    const rightColumn = document.getElementById('characterRightSlots');
 
-    Object.entries(equipmentByPosition).forEach(([position, equipmentNames]) => {
+    if (!leftColumn || !rightColumn) {
+        return;
+    }
+
+    leftColumn.innerHTML = '';
+    rightColumn.innerHTML = '';
+
+    const slotPlan = buildCharacterSlotPlan(equipmentByPosition);
+
+    slotPlan.forEach(slot => {
         const group = document.createElement('div');
-        group.className = 'character-field';
+        group.className = 'character-slot';
 
         const label = document.createElement('label');
-        label.className = 'character-field-label';
-        label.textContent = position;
+        label.className = 'character-slot-label';
+        label.textContent = slot.label;
 
         const select = document.createElement('select');
         select.className = 'search-input';
-        select.dataset.position = position;
+        select.dataset.position = slot.position;
 
         const emptyOption = document.createElement('option');
         emptyOption.value = '';
         emptyOption.textContent = '不裝備';
         select.appendChild(emptyOption);
 
-        equipmentNames.forEach(name => {
+        slot.equipmentNames.forEach(name => {
             const option = document.createElement('option');
             option.value = name;
             option.textContent = name;
@@ -425,7 +434,62 @@ function renderCharacterEquipmentForm(equipmentByPosition) {
 
         group.appendChild(label);
         group.appendChild(select);
-        container.appendChild(group);
+
+        if (slot.side === 'right') {
+            rightColumn.appendChild(group);
+            return;
+        }
+        leftColumn.appendChild(group);
+    });
+}
+
+/**
+ * 建立角色配裝欄位配置，讓版面接近建議 UI 圖
+ * @param {Object<string, string[]>} equipmentByPosition 位置與裝備名稱列表
+ * @returns {Array<{position: string, label: string, equipmentNames: string[], side: string}>}
+ */
+function buildCharacterSlotPlan(equipmentByPosition) {
+    const order = [
+        '飾品1', '飾品2', '寶物1', '寶物2', '主武', '副武',
+        '頭盔', '衣服', '手套', '鞋子'
+    ];
+    const sideBySlot = {
+        '飾品1': 'left',
+        '飾品2': 'left',
+        '寶物1': 'left',
+        '寶物2': 'left',
+        '主武': 'left',
+        '副武': 'left',
+        '頭盔': 'right',
+        '衣服': 'right',
+        '手套': 'right',
+        '鞋子': 'right'
+    };
+    const duplicatePositions = new Set(['飾品', '寶物']);
+    const slots = [];
+
+    Object.entries(equipmentByPosition).forEach(([position, equipmentNames]) => {
+        const copyCount = duplicatePositions.has(position) ? 2 : 1;
+        for (let i = 1; i <= copyCount; i += 1) {
+            const slotName = copyCount === 2 ? `${position}${i}` : position;
+            slots.push({
+                position,
+                label: slotName,
+                equipmentNames: equipmentNames || [],
+                side: sideBySlot[slotName] || sideBySlot[position] || 'right'
+            });
+        }
+    });
+
+    return slots.sort((a, b) => {
+        const aIndex = order.indexOf(a.label);
+        const bIndex = order.indexOf(b.label);
+        const safeA = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
+        const safeB = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
+        if (safeA !== safeB) {
+            return safeA - safeB;
+        }
+        return a.label.localeCompare(b.label, 'zh-Hant');
     });
 }
 
