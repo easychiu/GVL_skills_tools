@@ -490,6 +490,9 @@ class GVLDataHandler:
                     pvals[i] += sk.get(ps, 0)
                 total_bonus += eq_total_cache[id(eq)]
                 eq_names.append(eq['name'])
+            # 同一裝備名稱不可重複裝備
+            if len(eq_names) != len(set(eq_names)):
+                continue
             score_key = tuple(pvals) + (total_bonus,)
             scored_combos.append((score_key, eq_names))
 
