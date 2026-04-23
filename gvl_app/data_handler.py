@@ -525,10 +525,13 @@ class GVLDataHandler:
                 priority_target - abs(priority_values.get(skill, 0) - priority_target)
                 for skill in p_skills
             )
-            priority_total = sum(priority_score)
+            priority_closeness_total = sum(priority_score)
             priority_raw_total = sum(priority_values.values())
             total_bonus = sum(skill_result.get('bonus_skills', {}).values())
-            score_key = priority_score + (priority_total, priority_raw_total, total_bonus)
+            score_key = (
+                priority_score
+                + (priority_closeness_total, priority_raw_total, total_bonus)
+            )
 
             results.append({
                 'equipment_names': eq_names,
