@@ -1,7 +1,7 @@
 """GVL 裝備表數據處理模塊"""
 import pandas as pd
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 import json
 
 
@@ -167,7 +167,7 @@ class GVLDataHandler:
             result[profession] = caps_by_name.get(profession, default_caps)
         return result
 
-    def _load_sailor_skills_from_menu(self) -> set[str]:
+    def _load_sailor_skills_from_menu(self) -> Set[str]:
         """從選單位置=航海士載入可觸發+1的技能集合"""
         menu = self.data['menu']
         sailor_rows = menu[menu['位置'] == '航海士']
@@ -314,8 +314,7 @@ class GVLDataHandler:
             'sailor_bonus': sailor_bonus,
             'skill_caps': skill_caps,
             'bonus_skills': bonus_skills,
-            'highest_skills': highest_skills,
-            'total_skills': highest_skills
+            'highest_skills': highest_skills
         }
 
     def get_config_by_name(self, config_name: str) -> Optional[Dict]:

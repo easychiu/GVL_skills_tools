@@ -470,7 +470,7 @@ function displayCharacterResults(data) {
         .map(([skill, level]) => `<span class="skill-item">${escapeHtml(skill)}(+${escapeHtml(level)})</span>`)
         .join('') || '<em>未啟用航海士加成</em>';
 
-    const highestSkillsHtml = Object.entries(data.highest_skills || data.total_skills || {})
+    const highestSkillsHtml = Object.entries(data.highest_skills || {})
         .map(([skill, level]) => `<span class="skill-item">${escapeHtml(skill)}(${escapeHtml(level)})</span>`)
         .join('') || '<em>目前沒有技能加成</em>';
 
