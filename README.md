@@ -48,12 +48,15 @@ python main.py gui
 ```bash
 # 網頁應用
 python main.py web
-# 訪問 http://127.0.0.1:5000
+# 電腦可開 http://127.0.0.1:5000
+# 手機同 Wi-Fi 可開 http://<你的電腦IP>:5000
 
 # 命令列工具
 python main.py cli search --name "戒指"
 python main.py cli search --skill "炮術" --min-level 2
 ```
+
+若只想本機存取，改用：`python main.py web --host 127.0.0.1`
 
 ## 🌐 提供外部網頁工具讀取（API）
 

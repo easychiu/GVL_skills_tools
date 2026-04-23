@@ -14,7 +14,9 @@ pip install -r requirements.txt
 ```bash
 python main.py web
 ```
-然後在瀏覽器中打開：http://127.0.0.1:5000
+然後在瀏覽器中打開：
+- 電腦本機：http://127.0.0.1:5000
+- 手機同 Wi-Fi：http://<你的電腦IP>:5000
 
 #### 選項 B：使用命令行工具
 ```bash
