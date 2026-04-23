@@ -281,6 +281,53 @@ h3 {
     border-radius: 8px;
 }
 
+/* 角色配裝 */
+.character-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.character-field {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+.character-field-label {
+    display: block;
+    margin-bottom: 6px;
+    color: #555;
+    font-weight: 500;
+}
+
+.character-summary {
+    background: white;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+.character-summary ul {
+    margin-top: 8px;
+    padding-left: 18px;
+}
+
+.character-skills-block {
+    background: white;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+.character-skills-block h4 {
+    margin-bottom: 10px;
+    color: #444;
+}
+
 .config-position {
     margin-bottom: 20px;
     padding-bottom: 20px;

@@ -46,4 +46,27 @@ if data['results']:
     print(f"第一個結果: {data['results'][0]['name']}")
 print()
 
+# 測試職業 API
+print("測試 /api/professions:")
+response = client.get('/api/professions')
+print(f"狀態碼: {response.status_code}")
+data = response.get_json()
+print(f"職業數: {data['count']}")
+print()
+
+# 測試角色技能計算 API
+print("測試 /api/character/calculate:")
+response = client.post(
+    '/api/character/calculate',
+    json={
+        'profession': '砲術家',
+        'equipment_names': ['丁卡族戒指']
+    }
+)
+print(f"狀態碼: {response.status_code}")
+data = response.get_json()
+print(f"職業: {data['profession']}")
+print(f"總技能數: {len(data['total_skills'])}")
+print()
+
 print("✅ 所有 API 測試完成！")

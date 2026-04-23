@@ -97,6 +97,51 @@ def api_skills():
     })
 
 
+@app.route('/api/professions')
+def api_professions():
+    """獲取職業與技能加成API"""
+    professions = handler.get_professions()
+    return jsonify({
+        'professions': professions,
+        'count': len(professions)
+    })
+
+
+@app.route('/api/character/options')
+def api_character_options():
+    """獲取角色配裝選項API"""
+    equipment_by_position = {}
+    for position in sorted(handler.positions):
+        position_equipment = handler.get_equipment_by_position(position)
+        equipment_by_position[position] = sorted(
+            [eq['name'] for eq in position_equipment]
+        )
+
+    return jsonify({
+        'positions': sorted(list(handler.positions)),
+        'equipment_by_position': equipment_by_position,
+        'professions': handler.get_professions()
+    })
+
+
+@app.route('/api/character/calculate', methods=['POST'])
+def api_character_calculate():
+    """計算角色技能API"""
+    payload = request.get_json(silent=True) or {}
+    profession = payload.get('profession', '通用')
+    equipment_names = payload.get('equipment_names', [])
+
+    if not isinstance(equipment_names, list):
+        return jsonify({'error': 'equipment_names 必須為陣列'}), 400
+
+    try:
+        result = handler.calculate_character_skills(profession, equipment_names)
+    except ValueError as err:
+        return jsonify({'error': str(err)}), 400
+
+    return jsonify(result)
+
+
 @app.route('/api/config/<config_name>')
 def api_config(config_name):
     """獲取預設配置API"""
