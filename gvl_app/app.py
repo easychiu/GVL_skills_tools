@@ -2,6 +2,7 @@
 from flask import Flask, render_template, request, jsonify, send_from_directory
 import os
 from pathlib import Path
+from werkzeug.exceptions import BadRequest
 from data_handler import GVLDataHandler
 
 # 初始化Flask應用
@@ -95,6 +96,68 @@ def api_skills():
         'skills': sorted(list(handler.skills)),
         'count': len(handler.skills)
     })
+
+
+@app.route('/api/professions')
+def api_professions():
+    """獲取職業與技能加成API"""
+    professions = handler.get_professions()
+    return jsonify({
+        'professions': professions,
+        'count': len(professions)
+    })
+
+
+@app.route('/api/character/options')
+def api_character_options():
+    """獲取角色配裝選項API，包含位置、裝備列表與職業資訊"""
+    equipment_by_position = {}
+    for position in sorted(handler.positions):
+        position_equipment = handler.get_equipment_by_position(position)
+        equipment_by_position[position] = sorted(
+            [eq['name'] for eq in position_equipment]
+        )
+
+    return jsonify({
+        'positions': sorted(list(handler.positions)),
+        'equipment_by_position': equipment_by_position,
+        'professions': handler.get_professions()
+    })
+
+
+@app.route('/api/character/calculate', methods=['POST'])
+def api_character_calculate():
+    """計算角色技能API
+
+    Request JSON:
+        profession: 職業名稱
+        equipment_names: 裝備名稱陣列
+
+    Response JSON:
+        職業、已選裝備、裝備技能、職業加成、總技能
+    """
+    try:
+        payload = request.get_json()
+    except BadRequest:
+        return jsonify({'error': 'JSON 格式錯誤'}), 400
+
+    if payload is None:
+        payload = {}
+    if not isinstance(payload, dict):
+        return jsonify({'error': '請提供 JSON 物件'}), 400
+
+    profession = payload.get('profession', '通用')
+    equipment_names = payload.get('equipment_names', [])
+
+    if not isinstance(equipment_names, list):
+        return jsonify({'error': 'equipment_names 必須為陣列'}), 400
+
+    try:
+        result = handler.calculate_character_skills(profession, equipment_names)
+    except ValueError:
+        return jsonify({'error': f'不支持的職業: {profession}'}), 400
+
+    return jsonify(result)
 
 
 @app.route('/api/config/<config_name>')

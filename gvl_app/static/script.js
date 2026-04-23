@@ -4,8 +4,18 @@
 let state = {
     currentPage: 1,
     perPage: 20,
-    totalPages: 1
+    totalPages: 1,
+    characterOptions: null
 };
+
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
 
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
@@ -17,6 +27,7 @@ function initializePage() {
     loadPositions();
     loadSkills();
     loadEquipmentPage();
+    loadCharacterOptions();
     loadStats();
     setupTabHandlers();
 }
@@ -308,6 +319,154 @@ function loadStats() {
             displayStats(data);
         })
         .catch(error => console.error('Error loading stats:', error));
+}
+
+// 加載角色配裝選項
+function loadCharacterOptions() {
+    fetch('/api/character/options')
+        .then(response => response.json())
+        .then(data => {
+            state.characterOptions = data;
+            renderProfessionOptions(data.professions);
+            renderCharacterEquipmentForm(data.equipment_by_position);
+        })
+        .catch(error => console.error('Error loading character options:', error));
+}
+
+/**
+ * 顯示職業選項
+ * @param {Object<string, Object<string, number>>} professions 職業與技能加成映射
+ */
+function renderProfessionOptions(professions) {
+    const select = document.getElementById('professionSelect');
+    select.innerHTML = '';
+
+    Object.keys(professions).forEach(profession => {
+        const option = document.createElement('option');
+        option.value = profession;
+        option.textContent = profession;
+        select.appendChild(option);
+    });
+}
+
+/**
+ * 顯示配裝選單
+ * @param {Object<string, string[]>} equipmentByPosition 位置與裝備名稱列表映射
+ */
+function renderCharacterEquipmentForm(equipmentByPosition) {
+    const container = document.getElementById('characterEquipmentForm');
+    container.innerHTML = '';
+
+    Object.entries(equipmentByPosition).forEach(([position, equipmentNames]) => {
+        const group = document.createElement('div');
+        group.className = 'character-field';
+
+        const label = document.createElement('label');
+        label.className = 'character-field-label';
+        label.textContent = position;
+
+        const select = document.createElement('select');
+        select.className = 'search-input';
+        select.dataset.position = position;
+
+        const emptyOption = document.createElement('option');
+        emptyOption.value = '';
+        emptyOption.textContent = '不裝備';
+        select.appendChild(emptyOption);
+
+        equipmentNames.forEach(name => {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name;
+            select.appendChild(option);
+        });
+
+        group.appendChild(label);
+        group.appendChild(select);
+        container.appendChild(group);
+    });
+}
+
+/**
+ * 收集角色配裝資料並呼叫 API 計算技能
+ */
+function calculateCharacterSkills() {
+    const profession = document.getElementById('professionSelect').value;
+    const equipmentNames = [];
+
+    document.querySelectorAll('#characterEquipmentForm select').forEach(select => {
+        if (select.value) {
+            equipmentNames.push(select.value);
+        }
+    });
+
+    fetch('/api/character/calculate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            profession,
+            equipment_names: equipmentNames
+        })
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            displayCharacterResults(data);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('計算角色技能失敗');
+        });
+}
+
+/**
+ * 顯示角色技能計算結果
+ * @param {Object} data 計算結果資料
+ */
+function displayCharacterResults(data) {
+    const container = document.getElementById('characterResults');
+    const content = document.getElementById('characterResultsContent');
+
+    const totalSkillsHtml = Object.entries(data.total_skills)
+        .map(([skill, level]) => `<span class="skill-item">${escapeHtml(skill)}(+${escapeHtml(level)})</span>`)
+        .join('') || '<em>目前沒有技能加成</em>';
+
+    const professionBonusHtml = Object.entries(data.profession_bonus)
+        .map(([skill, level]) => `<span class="skill-item">${escapeHtml(skill)}(+${escapeHtml(level)})</span>`)
+        .join('') || '<em>此職業無額外技能加成</em>';
+
+    const selectedEquipmentHtml = data.selected_equipment
+        .map(eq => `<li>${escapeHtml(eq.position)}：${escapeHtml(eq.name)}</li>`)
+        .join('') || '<li>尚未選擇裝備</li>';
+
+    const invalidEquipmentHtml = (data.invalid_equipment || [])
+        .map(name => `<li>${escapeHtml(name)}</li>`)
+        .join('');
+
+    content.innerHTML = `
+        <div class="character-summary">
+            <div><strong>職業：</strong>${escapeHtml(data.profession)}</div>
+            <div><strong>已選裝備：</strong></div>
+            <ul>${selectedEquipmentHtml}</ul>
+            ${invalidEquipmentHtml ? `<div><strong>未找到裝備：</strong><ul>${invalidEquipmentHtml}</ul></div>` : ''}
+        </div>
+        <div class="character-skills-block">
+            <h4>職業技能加成</h4>
+            <div>${professionBonusHtml}</div>
+        </div>
+        <div class="character-skills-block">
+            <h4>總技能（職業 + 裝備）</h4>
+            <div>${totalSkillsHtml}</div>
+        </div>
+    `;
+
+    container.style.display = 'block';
+    container.scrollIntoView({ behavior: 'smooth' });
 }
 
 // 顯示統計信息

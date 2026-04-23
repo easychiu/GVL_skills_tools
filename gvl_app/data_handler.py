@@ -19,7 +19,9 @@ class GVLDataHandler:
         self.all_equipment = []
         self.positions = set()
         self.skills = set()
+        self.professions = {}
         self.load_data()
+        self.professions = self._get_profession_data()
 
     def load_data(self):
         """從Excel文件加載數據"""
@@ -94,6 +96,32 @@ class GVLDataHandler:
                 # 跳過有問題的行
                 continue
 
+    def _get_profession_data(self) -> Dict[str, Dict[str, int]]:
+        """獲取預設職業與技能加成映射"""
+        return {
+            '通用': {},
+            '冒險家': {
+                '航海技術': 2,
+                '地理學': 1,
+                '搜索': 1
+            },
+            '砲術家': {
+                '炮術': 2,
+                '彈道學': 1,
+                '水平射擊': 1
+            },
+            '劍士': {
+                '劍術': 2,
+                '突擊': 1,
+                '防禦': 1
+            },
+            '商人': {
+                '會計': 2,
+                '社交': 1,
+                '運用': 1
+            }
+        }
+
     def get_equipment_by_position(self, position: str) -> List[Dict]:
         """根據位置獲取所有裝備
         
@@ -150,6 +178,62 @@ class GVLDataHandler:
             if skill in eq['skills'] and eq['skills'][skill] >= min_level:
                 results.append(eq)
         return results
+
+    def get_professions(self) -> Dict[str, Dict[str, int]]:
+        """獲取所有職業與技能加成"""
+        return self.professions
+
+    def calculate_character_skills(
+        self, profession: str, equipment_names: List[str]
+    ) -> Dict[str, Any]:
+        """計算角色總技能（裝備 + 職業）
+
+        Args:
+            profession: 職業名稱
+            equipment_names: 裝備名稱列表
+
+        Returns:
+            包含職業、已選裝備、裝備技能、職業加成與總技能的字典
+
+        Raises:
+            ValueError: 職業名稱不存在時拋出
+        """
+        if profession not in self.professions:
+            raise ValueError(f'不支持的職業: {profession}')
+
+        profession_bonus = self.professions[profession]
+        equipment_skills = {}
+        selected_equipment = []
+        invalid_equipment = []
+
+        for name in equipment_names:
+            eq = self.get_equipment_by_name(name)
+            if not eq:
+                invalid_equipment.append(name)
+                continue
+            selected_equipment.append({
+                'position': eq['position'],
+                'name': eq['name']
+            })
+            for skill, level in eq['skills'].items():
+                equipment_skills[skill] = equipment_skills.get(skill, 0) + level
+
+        total_skills = equipment_skills.copy()
+        for skill, level in profession_bonus.items():
+            total_skills[skill] = total_skills.get(skill, 0) + level
+
+        total_skills = dict(
+            sorted(total_skills.items(), key=lambda item: (-item[1], item[0]))
+        )
+
+        return {
+            'profession': profession,
+            'selected_equipment': selected_equipment,
+            'invalid_equipment': invalid_equipment,
+            'equipment_skills': equipment_skills,
+            'profession_bonus': profession_bonus,
+            'total_skills': total_skills
+        }
 
     def get_config_by_name(self, config_name: str) -> Optional[Dict]:
         """根據配置名稱獲取完整配置

@@ -18,6 +18,7 @@
         <div class="tabs">
             <button class="tab-btn active" data-tab="search">搜索</button>
             <button class="tab-btn" data-tab="equipment">裝備</button>
+            <button class="tab-btn" data-tab="character">角色</button>
             <button class="tab-btn" data-tab="config">配置</button>
             <button class="tab-btn" data-tab="stats">統計</button>
         </div>
@@ -72,6 +73,28 @@
                 <button onclick="previousPage()" class="btn">‹ 上一頁</button>
                 <span id="pageInfo"></span>
                 <button onclick="nextPage()" class="btn">下一頁 ›</button>
+            </div>
+        </div>
+
+        <!-- 角色頁面 -->
+        <div id="character" class="tab-content">
+            <h2>角色配裝</h2>
+            <div class="search-section">
+                <h3>角色職業</h3>
+                <div class="search-form">
+                    <select id="professionSelect" class="search-input">
+                        <option value="通用">通用</option>
+                    </select>
+                </div>
+            </div>
+            <div class="search-section">
+                <h3>裝備配置</h3>
+                <div id="characterEquipmentForm" class="character-grid"></div>
+            </div>
+            <button onclick="calculateCharacterSkills()" class="btn btn-primary">計算角色技能</button>
+            <div id="characterResults" class="results-container" style="display: none;">
+                <h3>角色技能結果</h3>
+                <div id="characterResultsContent"></div>
             </div>
         </div>
 
