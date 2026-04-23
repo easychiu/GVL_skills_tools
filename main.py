@@ -9,6 +9,27 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / 'gvl_app'))
 
 
+def get_lan_ip():
+    """嘗試取得本機區網 IPv4 位址。"""
+    try:
+        host_info = socket.gethostbyname_ex(socket.gethostname())
+        for ip in host_info[2]:
+            if ip and not ip.startswith('127.'):
+                return ip
+    except OSError:
+        pass
+
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = info[4][0]
+            if ip and not ip.startswith('127.'):
+                return ip
+    except OSError:
+        pass
+
+    return '<你的電腦IP（可用 ipconfig/ifconfig 查看）>'
+
+
 def main():
     """主函數"""
     parser = argparse.ArgumentParser(
@@ -102,12 +123,7 @@ def main():
 
         display_host = args.host
         if args.host == '0.0.0.0':
-            try:
-                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-                    s.connect(('8.8.8.8', 80))
-                    display_host = s.getsockname()[0]
-            except OSError:
-                display_host = '<你的電腦IP>'
+            display_host = get_lan_ip()
 
         print("\n" + "="*60)
         print("🚀 GVL 裝備表 Web 應用已啟動")
