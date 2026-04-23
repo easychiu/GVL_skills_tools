@@ -1,12 +1,13 @@
 """GVL 裝備表數據處理模塊"""
 import pandas as pd
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 import json
 
 
 class GVLDataHandler:
     """GVL裝備表數據處理類"""
+    HEADER_EQUIPMENT_NAME = '裝備名稱'
 
     def __init__(self, excel_file: str):
         """初始化數據處理器
@@ -20,8 +21,11 @@ class GVLDataHandler:
         self.positions = set()
         self.skills = set()
         self.professions = {}
+        self.skill_caps = {}
+        self.sailor_skills = set()
+        # 系統列標記：重複標題（位置=位置）與非裝備資料（職業、角色上限）皆需排除
+        self.system_positions = {'位置', '職業', '角色上限'}
         self.load_data()
-        self.professions = self._get_profession_data()
 
     def load_data(self):
         """從Excel文件加載數據"""
@@ -39,11 +43,17 @@ class GVLDataHandler:
             cols = self.data['source'].columns.tolist()
             self.skills = set(cols[2:])  # 跳過前兩列
             
-            # 提取所有位置
-            self.positions = set(self.data['source']['位置'].dropna().unique())
+            # 提取所有可裝備位置（排除系統行）
+            self.positions = set(
+                pos for pos in self.data['source']['位置'].dropna().unique()
+                if pos not in self.system_positions
+            )
             
             # 建立所有裝備的完整清單
             self._build_equipment_list()
+            self.professions = self._load_professions_from_source()
+            self.skill_caps = self._load_skill_caps_from_source()
+            self.sailor_skills = self._load_sailor_skills_from_menu()
             
             print(f"✓ 成功加載數據")
             print(f"  - 位置類型: {len(self.positions)}")
@@ -62,7 +72,7 @@ class GVLDataHandler:
         # 移除空行和標題行
         df = df.dropna(subset=['裝備名稱'])
         # 移除包含技能名稱作為值的行（通常是複製的標題）
-        df = df[df['裝備名稱'] != '裝備名稱']
+        df = df[df['裝備名稱'] != self.HEADER_EQUIPMENT_NAME]
         
         for _, row in df.iterrows():
             try:
@@ -71,6 +81,8 @@ class GVLDataHandler:
                 
                 # 跳過無效數據
                 if pd.isna(position) or pd.isna(name):
+                    continue
+                if position in self.system_positions:
                     continue
                 
                 equipment = {
@@ -96,31 +108,85 @@ class GVLDataHandler:
                 # 跳過有問題的行
                 continue
 
-    def _get_profession_data(self) -> Dict[str, Dict[str, int]]:
-        """獲取預設職業與技能加成映射"""
-        return {
-            '通用': {},
-            '冒險家': {
-                '航海技術': 2,
-                '地理學': 1,
-                '搜索': 1
-            },
-            '砲術家': {
-                '炮術': 2,
-                '彈道學': 1,
-                '水平射擊': 1
-            },
-            '劍士': {
-                '劍術': 2,
-                '突擊': 1,
-                '防禦': 1
-            },
-            '商人': {
-                '會計': 2,
-                '社交': 1,
-                '運用': 1
-            }
-        }
+    def _extract_skill_values(self, row: pd.Series) -> Dict[str, int]:
+        """從資料列提取技能值"""
+        skill_values = {}
+        for skill in self.skills:
+            if skill not in row:
+                continue
+            value = row[skill]
+            if pd.isna(value):
+                continue
+            try:
+                level = int(value)
+            except (ValueError, TypeError):
+                continue
+            if level > 0:
+                skill_values[skill] = level
+        return skill_values
+
+    def _load_professions_from_source(self) -> Dict[str, Dict[str, int]]:
+        """從資料源位置=職業載入職業技能加成"""
+        df = self.data['source']
+        profession_rows = df[df['位置'] == '職業'].dropna(subset=['裝備名稱'])
+        profession_rows = profession_rows[
+            profession_rows['裝備名稱'] != self.HEADER_EQUIPMENT_NAME
+        ]
+
+        professions = {'通用': {}}
+        for _, row in profession_rows.iterrows():
+            name = row['裝備名稱']
+            if pd.isna(name):
+                continue
+            name = str(name).strip()
+            if not name:
+                continue
+            professions[name] = self._extract_skill_values(row)
+        return professions
+
+    def _sort_skill_map(self, skill_map: Dict[str, int]) -> Dict[str, int]:
+        """排序技能映射：先按數值由大到小，同分時按技能名稱升序"""
+        return dict(sorted(skill_map.items(), key=lambda item: (-item[1], item[0])))
+
+    def _load_skill_caps_from_source(self) -> Dict[str, Dict[str, int]]:
+        """從資料源位置=角色上限載入技能上限"""
+        df = self.data['source']
+        cap_rows = df[df['位置'] == '角色上限'].dropna(how='all')
+        if cap_rows.empty:
+            return {}
+
+        default_caps = {}
+        caps_by_name = {}
+        for _, row in cap_rows.iterrows():
+            caps = self._extract_skill_values(row)
+            if not caps:
+                continue
+            if not default_caps:
+                default_caps = caps
+            name = row.get('裝備名稱')
+            if pd.notna(name) and str(name).strip():
+                caps_by_name[str(name).strip()] = caps
+
+        if not default_caps:
+            return {}
+
+        result = {'通用': default_caps}
+        for profession in self.professions.keys():
+            result[profession] = caps_by_name.get(profession, default_caps)
+        return result
+
+    def _load_sailor_skills_from_menu(self) -> Set[str]:
+        """從選單位置=航海士載入可觸發+1的技能集合"""
+        menu = self.data['menu']
+        sailor_rows = menu[menu['位置'] == '航海士']
+        skills = set()
+        for _, row in sailor_rows.iterrows():
+            for skill in self.skills:
+                if skill not in row:
+                    continue
+                if pd.notna(row[skill]):
+                    skills.add(skill)
+        return skills
 
     def get_equipment_by_position(self, position: str) -> List[Dict]:
         """根據位置獲取所有裝備
@@ -184,7 +250,7 @@ class GVLDataHandler:
         return self.professions
 
     def calculate_character_skills(
-        self, profession: str, equipment_names: List[str]
+        self, profession: str, equipment_names: List[str], is_sailor: bool = False
     ) -> Dict[str, Any]:
         """計算角色總技能（裝備 + 職業）
 
@@ -202,6 +268,7 @@ class GVLDataHandler:
             raise ValueError(f'不支持的職業: {profession}')
 
         profession_bonus = self.professions[profession]
+        skill_caps = self.skill_caps.get(profession, self.skill_caps.get('通用', {}))
         equipment_skills = {}
         selected_equipment = []
         invalid_equipment = []
@@ -218,21 +285,43 @@ class GVLDataHandler:
             for skill, level in eq['skills'].items():
                 equipment_skills[skill] = equipment_skills.get(skill, 0) + level
 
-        total_skills = equipment_skills.copy()
-        for skill, level in profession_bonus.items():
-            total_skills[skill] = total_skills.get(skill, 0) + level
+        sailor_bonus = {}
+        if is_sailor:
+            for skill in self.sailor_skills:
+                sailor_bonus[skill] = 1
 
-        total_skills = dict(
-            sorted(total_skills.items(), key=lambda item: (-item[1], item[0]))
-        )
+        bonus_skills = {}
+        all_bonus_keys = set(equipment_skills) | set(profession_bonus) | set(sailor_bonus)
+        for skill in all_bonus_keys:
+            bonus_skills[skill] = (
+                equipment_skills.get(skill, 0)
+                + profession_bonus.get(skill, 0)
+                + sailor_bonus.get(skill, 0)
+            )
+
+        highest_skills = {}
+        all_skill_keys = set(skill_caps) | set(bonus_skills)
+        for skill in all_skill_keys:
+            highest_skills[skill] = skill_caps.get(skill, 0) + bonus_skills.get(skill, 0)
+
+        equipment_skills = self._sort_skill_map(equipment_skills)
+        profession_bonus = self._sort_skill_map(profession_bonus)
+        sailor_bonus = self._sort_skill_map(sailor_bonus)
+        skill_caps = self._sort_skill_map(skill_caps)
+        bonus_skills = self._sort_skill_map(bonus_skills)
+        highest_skills = self._sort_skill_map(highest_skills)
 
         return {
             'profession': profession,
+            'is_sailor': is_sailor,
             'selected_equipment': selected_equipment,
             'invalid_equipment': invalid_equipment,
             'equipment_skills': equipment_skills,
             'profession_bonus': profession_bonus,
-            'total_skills': total_skills
+            'sailor_bonus': sailor_bonus,
+            'skill_caps': skill_caps,
+            'bonus_skills': bonus_skills,
+            'highest_skills': highest_skills
         }
 
     def get_config_by_name(self, config_name: str) -> Optional[Dict]:

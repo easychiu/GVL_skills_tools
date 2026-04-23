@@ -329,8 +329,50 @@ function loadCharacterOptions() {
             state.characterOptions = data;
             renderProfessionOptions(data.professions);
             renderCharacterEquipmentForm(data.equipment_by_position);
+            renderSailorSkillsHint(data.sailor_skills || []);
         })
         .catch(error => console.error('Error loading character options:', error));
+}
+
+/**
+ * 顯示航海士可加成技能提示
+ * @param {string[]} sailorSkills 航海士可加成技能列表
+ */
+function renderSailorSkillsHint(sailorSkills) {
+    const hint = document.getElementById('sailorSkillsHint');
+    if (!hint) {
+        return;
+    }
+
+    if (!sailorSkills.length) {
+        hint.innerHTML = '<em>未設定航海士可加成技能</em>';
+        return;
+    }
+
+    const skillsText = sailorSkills.map(skill => escapeHtml(skill)).join('、');
+    hint.innerHTML = `<small>航海士可加成技能：${skillsText}</small>`;
+}
+
+/**
+ * 將技能映射轉為 HTML 標籤集合
+ * @param {Object<string, number>} skills 技能與數值映射
+ * @param {boolean} withPlus 是否以 +x 顯示數值
+ * @param {string} emptyText 空資料時顯示文字
+ * @returns {string} 技能 HTML 內容
+ */
+function renderSkillItems(skills, withPlus = false, emptyText = '無') {
+    const entries = Object.entries(skills || {});
+    if (!entries.length) {
+        return `<em>${escapeHtml(emptyText)}</em>`;
+    }
+    return entries
+        .map(([skill, level]) => {
+            const valueText = withPlus
+                ? `+${escapeHtml(level)}`
+                : `${escapeHtml(level)}`;
+            return `<span class="skill-item">${escapeHtml(skill)}(${valueText})</span>`;
+        })
+        .join('');
 }
 
 /**
@@ -392,6 +434,7 @@ function renderCharacterEquipmentForm(equipmentByPosition) {
  */
 function calculateCharacterSkills() {
     const profession = document.getElementById('professionSelect').value;
+    const isSailor = document.getElementById('sailorCheckbox')?.checked || false;
     const equipmentNames = [];
 
     document.querySelectorAll('#characterEquipmentForm select').forEach(select => {
@@ -407,7 +450,8 @@ function calculateCharacterSkills() {
         },
         body: JSON.stringify({
             profession,
-            equipment_names: equipmentNames
+            equipment_names: equipmentNames,
+            is_sailor: isSailor
         })
     })
         .then(response => response.json())
@@ -432,13 +476,11 @@ function displayCharacterResults(data) {
     const container = document.getElementById('characterResults');
     const content = document.getElementById('characterResultsContent');
 
-    const totalSkillsHtml = Object.entries(data.total_skills)
-        .map(([skill, level]) => `<span class="skill-item">${escapeHtml(skill)}(+${escapeHtml(level)})</span>`)
-        .join('') || '<em>目前沒有技能加成</em>';
-
-    const professionBonusHtml = Object.entries(data.profession_bonus)
-        .map(([skill, level]) => `<span class="skill-item">${escapeHtml(skill)}(+${escapeHtml(level)})</span>`)
-        .join('') || '<em>此職業無額外技能加成</em>';
+    const skillCapsHtml = renderSkillItems(data.skill_caps, false, '未設定角色技能上限');
+    const equipmentBonusHtml = renderSkillItems(data.equipment_skills, true, '目前沒有裝備技能加成');
+    const professionBonusHtml = renderSkillItems(data.profession_bonus, true, '此職業無額外技能加成');
+    const sailorBonusHtml = renderSkillItems(data.sailor_bonus, true, '未啟用航海士加成');
+    const highestSkillsHtml = renderSkillItems(data.highest_skills, false, '目前沒有技能加成');
 
     const selectedEquipmentHtml = data.selected_equipment
         .map(eq => `<li>${escapeHtml(eq.position)}：${escapeHtml(eq.name)}</li>`)
@@ -451,17 +493,30 @@ function displayCharacterResults(data) {
     content.innerHTML = `
         <div class="character-summary">
             <div><strong>職業：</strong>${escapeHtml(data.profession)}</div>
+            <div><strong>航海士：</strong>${data.is_sailor ? '是' : '否'}</div>
             <div><strong>已選裝備：</strong></div>
             <ul>${selectedEquipmentHtml}</ul>
             ${invalidEquipmentHtml ? `<div><strong>未找到裝備：</strong><ul>${invalidEquipmentHtml}</ul></div>` : ''}
+        </div>
+        <div class="character-skills-block">
+            <h4>角色技能上限</h4>
+            <div>${skillCapsHtml}</div>
+        </div>
+        <div class="character-skills-block">
+            <h4>裝備技能加成（+x）</h4>
+            <div>${equipmentBonusHtml}</div>
         </div>
         <div class="character-skills-block">
             <h4>職業技能加成</h4>
             <div>${professionBonusHtml}</div>
         </div>
         <div class="character-skills-block">
-            <h4>總技能（職業 + 裝備）</h4>
-            <div>${totalSkillsHtml}</div>
+            <h4>航海士技能加成</h4>
+            <div>${sailorBonusHtml}</div>
+        </div>
+        <div class="character-skills-block">
+            <h4>最高技能（角色上限 + 職業 + 裝備 + 航海士）</h4>
+            <div>${highestSkillsHtml}</div>
         </div>
     `;
 
