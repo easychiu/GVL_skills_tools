@@ -222,6 +222,10 @@ class CharacterTab(ttk.Frame):
         super().__init__(parent)
         self.handler = handler
         self._slot_vars: Dict[str, tk.StringVar] = {}
+        # display_text → real equipment name, per slot
+        self._slot_display_to_name: Dict[str, Dict[str, str]] = {}
+        # skill hint label below each combobox
+        self._slot_skill_labels: Dict[str, tk.Label] = {}
         self._build()
         self._load_options()
 
@@ -277,11 +281,12 @@ class CharacterTab(ttk.Frame):
         if sailor_skills:
             self._sailor_hint.config(text='可加成：' + '、'.join(sailor_skills))
 
-        # 按位置建立裝備下拉選單
-        eq_by_pos: Dict[str, List[str]] = {}
+        # 按位置建立裝備物件列表（含技能）
+        eq_by_pos: Dict[str, List[dict]] = {}
         for pos in sorted(self.handler.positions):
             eq_by_pos[pos] = sorted(
-                [eq['name'] for eq in self.handler.get_equipment_by_position(pos)]
+                self.handler.get_equipment_by_position(pos),
+                key=lambda e: e['name']
             )
 
         for slot in self._build_slot_plan(eq_by_pos):
@@ -292,24 +297,79 @@ class CharacterTab(ttk.Frame):
             lf = ttk.LabelFrame(parent, text=slot['label'], padding=4)
             lf.pack(fill='x', pady=3)
 
-            choices = ['（不裝備）'] + slot['names']
+            # 建立顯示文字 → 真實名稱的對應表
+            display_map: Dict[str, str] = {}
+            choices = ['（不裝備）']
+            for eq in slot['equipment']:
+                skills = eq.get('skills', {})
+                if skills:
+                    skill_summary = ' '.join(
+                        f"{k}+{v}"
+                        for k, v in sorted(skills.items(), key=lambda x: -x[1])
+                    )
+                    display = f"{eq['name']}  [{skill_summary}]"
+                else:
+                    display = eq['name']
+                choices.append(display)
+                display_map[display] = eq['name']
+
+            self._slot_display_to_name[slot['label']] = display_map
+
             cb = ttk.Combobox(lf, textvariable=var, values=choices,
-                              state='readonly', width=24)
+                              state='readonly', width=36)
             cb.current(0)
             cb.pack(fill='x')
-            cb.bind('<<ComboboxSelected>>', self._on_change)
+
+            # 技能詳情提示標籤
+            skill_lbl = tk.Label(lf, text='', fg='#555555',
+                                 bg='#f8f8f8', font=('Microsoft YaHei', 9),
+                                 anchor='w', justify='left', wraplength=260)
+            skill_lbl.pack(fill='x', padx=2)
+            self._slot_skill_labels[slot['label']] = skill_lbl
+
+            cb.bind('<<ComboboxSelected>>',
+                    lambda e, lbl=slot['label'], sv=var, sl=skill_lbl, dm=display_map:
+                    self._on_slot_change(lbl, sv, sl, dm))
 
         self._on_change()
 
-    def _build_slot_plan(self, eq_by_pos: Dict[str, List[str]]) -> List[dict]:
+    @staticmethod
+    def _skills_detail_text(eq_name: str, display_map: Dict[str, str],
+                            handler: 'GVLDataHandler') -> str:
+        """根據顯示文字取得技能詳細說明（用於提示標籤）"""
+        real_name = display_map.get(eq_name)
+        if not real_name:
+            return ''
+        eq = handler.get_equipment_by_name(real_name)
+        if not eq or not eq.get('skills'):
+            return '無技能加成'
+        parts = ', '.join(
+            f"{k} +{v}"
+            for k, v in sorted(eq['skills'].items(), key=lambda x: -x[1])
+        )
+        return f"技能：{parts}"
+
+    def _on_slot_change(self, slot_label: str, sv: tk.StringVar,
+                        skill_lbl: tk.Label, display_map: Dict[str, str],
+                        _event=None):
+        """單一槽位選擇改變：更新技能提示標籤，再重算總技能"""
+        display = sv.get()
+        if display and display != '（不裝備）':
+            text = self._skills_detail_text(display, display_map, self.handler)
+            skill_lbl.config(text=text)
+        else:
+            skill_lbl.config(text='')
+        self._on_change()
+
+    def _build_slot_plan(self, eq_by_pos: Dict[str, List[dict]]) -> List[dict]:
         slots = []
-        for pos, names in eq_by_pos.items():
+        for pos, equipment in eq_by_pos.items():
             count = 2 if pos in self.DUPLICATE else 1
             for i in range(1, count + 1):
                 label = f'{pos}{i}' if count > 1 else pos
                 side = self.SLOT_SIDE.get(label) or self.SLOT_SIDE.get(pos, 'right')
                 slots.append({'position': pos, 'label': label,
-                              'names': names, 'side': side})
+                              'equipment': equipment, 'side': side})
         order_map = {s: i for i, s in enumerate(self.SLOT_ORDER)}
         slots.sort(key=lambda s: order_map.get(s['label'], 999))
         return slots
@@ -317,10 +377,13 @@ class CharacterTab(ttk.Frame):
     def _on_change(self, _event=None):
         profession = self._prof_var.get()
         is_sailor = self._sailor_var.get()
-        eq_names = [
-            var.get() for var in self._slot_vars.values()
-            if var.get() and var.get() != '（不裝備）'
-        ]
+        eq_names = []
+        for slot_label, var in self._slot_vars.items():
+            display = var.get()
+            if display and display != '（不裝備）':
+                # 從顯示文字還原真實裝備名稱
+                real_name = self._slot_display_to_name.get(slot_label, {}).get(display, display)
+                eq_names.append(real_name)
         if not profession:
             return
         try:
