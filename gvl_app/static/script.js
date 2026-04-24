@@ -87,6 +87,7 @@ function initializePage() {
     loadCharacterOptions();
     loadStats();
     setupTabHandlers();
+    setupAutoBuilderListeners();
 }
 
 // 設置標籤處理器
@@ -769,7 +770,29 @@ function displayStats(stats) {
 
 // ── 自動配裝功能 ──────────────────────────────────────────────────────────
 
+// Must match the 5 autoPriority<N> select IDs declared in index.html
 const AUTO_PRIORITY_IDS = ['autoPriority1', 'autoPriority2', 'autoPriority3', 'autoPriority4', 'autoPriority5'];
+
+/**
+ * 綁定自動配裝觸發按鈕與結果區域的事件監聽器（使用事件委派）
+ */
+function setupAutoBuilderListeners() {
+    const triggerBtn = document.getElementById('autoTriggerBtn');
+    if (triggerBtn) {
+        triggerBtn.addEventListener('click', triggerAutoBuild);
+    }
+
+    // 事件委派：捕捉結果表格中各方案的「套用」按鈕
+    const resultsDiv = document.getElementById('autoBuildResults');
+    if (resultsDiv) {
+        resultsDiv.addEventListener('click', function (e) {
+            const btn = e.target.closest('.auto-build-apply-btn');
+            if (btn) {
+                applyAutoBuildPlan(parseInt(btn.dataset.planIndex, 10));
+            }
+        });
+    }
+}
 
 /**
  * 初始化自動配裝優先技能下拉選單
@@ -779,6 +802,7 @@ function renderAutoBuildSkillDropdowns(skills) {
     AUTO_PRIORITY_IDS.forEach(id => {
         const select = document.getElementById(id);
         if (!select) return;
+        // Keep the first '（不選）' option and replace the rest
         while (select.options.length > 1) select.remove(1);
         skills.forEach(skill => {
             const opt = document.createElement('option');
@@ -884,7 +908,7 @@ function displayAutoBuildResults(plans, prioritySkills) {
             <td>方案 ${i + 1}</td>
             ${skillVals}
             <td class="auto-build-eq-cell">${eqList}</td>
-            <td><button class="btn btn-primary auto-build-apply-btn" onclick="applyAutoBuildPlan(${i})">套用</button></td>
+            <td><button class="btn btn-primary auto-build-apply-btn" data-plan-index="${i}">套用</button></td>
         </tr>`;
     }).join('');
 
