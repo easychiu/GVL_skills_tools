@@ -1,0 +1,14 @@
+# Render 部署設定
+# 說明：https://render.com/docs/render-yaml-spec
+services:
+  - type: web
+    name: gvl-skills-tools
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    envVars:
+      # 設定 CORS 允許的來源；若不設定則預設為 * (允許所有來源)
+      # 建議生產環境指定為你的前端網域，例如 https://your-app.onrender.com
+      - key: GVL_API_ALLOW_ORIGIN
+        sync: false
+    autoDeploy: true

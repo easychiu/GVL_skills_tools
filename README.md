@@ -58,6 +58,37 @@ python main.py cli search --skill "炮術" --min-level 2
 
 若只想本機存取，改用：`python main.py web --host 127.0.0.1`
 
+## ☁️ 公開部署（Render）
+
+### 一鍵部署
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+
+### 手動部署步驟
+
+1. Fork 或 Push 此 repo 到你的 GitHub 帳號。
+2. 前往 [Render](https://render.com) → **New → Web Service**。
+3. 連結你的 GitHub repo。
+4. 設定如下：
+
+   | 欄位 | 值 |
+   |------|----|
+   | **Runtime** | Python |
+   | **Build Command** | `pip install -r requirements.txt` |
+   | **Start Command** | `gunicorn wsgi:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120` |
+
+5. 點 **Create Web Service**，等待部署完成後取得公開 HTTPS 網址。
+
+> **提示**：`render.yaml` 已內含上述設定，若使用 Render Blueprint 可自動套用。
+
+### 環境變數（選填）
+
+| 變數 | 說明 | 預設 |
+|------|------|------|
+| `GVL_API_ALLOW_ORIGIN` | CORS 允許來源 | `*` |
+
+---
+
 ## 🌐 提供外部網頁工具讀取（API）
 
 - 角色即時計算：`POST /api/character/calculate`
