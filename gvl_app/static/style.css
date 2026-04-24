@@ -808,6 +808,127 @@ select.slot-boarding {
     padding: 20px;
 }
 
+/* 自動配裝面板 */
+.auto-build-panel {
+    background: #f0f4ff;
+    border: 1px solid #c5d3f7;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 18px;
+}
+
+.auto-build-header {
+    font-weight: 700;
+    color: #3a5caa;
+    font-size: 1.05em;
+    margin-bottom: 10px;
+}
+
+.auto-build-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.auto-build-skills-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.auto-build-options-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.auto-build-label {
+    font-size: 0.9em;
+    color: #444;
+    white-space: nowrap;
+}
+
+.auto-skill-select {
+    flex: 0 0 auto;
+    min-width: 110px;
+    max-width: 160px;
+}
+
+.auto-skill-cap-input {
+    width: 70px;
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 1em;
+}
+
+.auto-build-poor-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    font-size: 0.9em;
+    color: #444;
+}
+
+.auto-build-results {
+    margin-top: 14px;
+    background: white;
+    border: 1px solid #dde5f8;
+    border-radius: 8px;
+    padding: 12px;
+    overflow-x: auto;
+}
+
+.auto-build-results-header {
+    font-weight: 600;
+    color: #3a5caa;
+    margin-bottom: 10px;
+}
+
+.auto-build-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+}
+
+.auto-build-table th {
+    background: #3a5caa;
+    color: white;
+    padding: 8px 10px;
+    text-align: center;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.auto-build-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #eee;
+    text-align: center;
+}
+
+.auto-build-table tbody tr:hover {
+    background: #f5f8ff;
+}
+
+.auto-build-eq-cell {
+    text-align: left !important;
+    word-break: break-all;
+}
+
+.auto-build-apply-btn {
+    padding: 6px 14px;
+    font-size: 0.9em;
+}
+
+.auto-build-hint {
+    margin-top: 8px;
+    font-size: 0.85em;
+    color: #888;
+}
+
 .error {
     background: #fee;
     color: #c33;

@@ -79,6 +79,31 @@
         <!-- 角色頁面 -->
         <div id="character" class="tab-content">
             <h2>角色配裝</h2>
+
+            <!-- 自動配裝面板 -->
+            <div class="auto-build-panel">
+                <div class="auto-build-header">⚡ 自動配裝</div>
+                <div class="auto-build-controls">
+                    <div class="auto-build-skills-row">
+                        <span class="auto-build-label">優先技能：</span>
+                        <select id="autoPriority1" class="search-input auto-skill-select"><option value="">（不選）</option></select>
+                        <select id="autoPriority2" class="search-input auto-skill-select"><option value="">（不選）</option></select>
+                        <select id="autoPriority3" class="search-input auto-skill-select"><option value="">（不選）</option></select>
+                        <select id="autoPriority4" class="search-input auto-skill-select"><option value="">（不選）</option></select>
+                        <select id="autoPriority5" class="search-input auto-skill-select"><option value="">（不選）</option></select>
+                    </div>
+                    <div class="auto-build-options-row">
+                        <label class="auto-build-label">技能上限：</label>
+                        <input type="number" id="autoSkillCap" value="25" min="1" max="99" class="auto-skill-cap-input">
+                        <label class="auto-build-poor-label">
+                            <input type="checkbox" id="autoPoorMode"> 我窮（排除質變裝備）
+                        </label>
+                        <button id="autoTriggerBtn" class="btn btn-primary">🔧 自動配裝</button>
+                    </div>
+                </div>
+                <div id="autoBuildResults" class="auto-build-results" style="display:none;"></div>
+            </div>
+
             <div class="character-main-layout">
                 <div class="character-stage-card">
                     <div class="character-controls">

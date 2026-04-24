@@ -6,7 +6,9 @@ let state = {
     perPage: 20,
     totalPages: 1,
     characterOptions: null,
-    equipmentSkillsMap: {}
+    equipmentSkillsMap: {},
+    allSkills: [],
+    autoBuildPlans: []
 };
 
 const CHARACTER_SLOT_SIDE_ORDER = [
@@ -85,6 +87,7 @@ function initializePage() {
     loadCharacterOptions();
     loadStats();
     setupTabHandlers();
+    setupAutoBuilderListeners();
 }
 
 // 設置標籤處理器
@@ -144,6 +147,8 @@ function loadSkills() {
                 option.textContent = skill;
                 select.appendChild(option);
             });
+            state.allSkills = data.skills;
+            renderAutoBuildSkillDropdowns(data.skills);
         })
         .catch(error => console.error('Error loading skills:', error));
 }
@@ -761,4 +766,216 @@ function displayStats(stats) {
     
     listDiv.appendChild(listContent);
     statsContent.appendChild(listDiv);
+}
+
+// ── 自動配裝功能 ──────────────────────────────────────────────────────────
+
+// Must match the 5 autoPriority<N> select IDs declared in index.html
+const AUTO_PRIORITY_IDS = ['autoPriority1', 'autoPriority2', 'autoPriority3', 'autoPriority4', 'autoPriority5'];
+
+/**
+ * 綁定自動配裝觸發按鈕與結果區域的事件監聽器（使用事件委派）
+ */
+function setupAutoBuilderListeners() {
+    const triggerBtn = document.getElementById('autoTriggerBtn');
+    if (triggerBtn) {
+        triggerBtn.addEventListener('click', triggerAutoBuild);
+    }
+
+    // 事件委派：捕捉結果表格中各方案的「套用」按鈕
+    const resultsDiv = document.getElementById('autoBuildResults');
+    if (resultsDiv) {
+        resultsDiv.addEventListener('click', function (e) {
+            const btn = e.target.closest('.auto-build-apply-btn');
+            if (btn) {
+                applyAutoBuildPlan(parseInt(btn.dataset.planIndex, 10));
+            }
+        });
+    }
+}
+
+/**
+ * 初始化自動配裝優先技能下拉選單
+ * @param {string[]} skills 所有技能列表
+ */
+function renderAutoBuildSkillDropdowns(skills) {
+    AUTO_PRIORITY_IDS.forEach(id => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        // Keep the first '（不選）' option and replace the rest
+        while (select.options.length > 1) select.remove(1);
+        skills.forEach(skill => {
+            const opt = document.createElement('option');
+            opt.value = skill;
+            opt.textContent = skill;
+            select.appendChild(opt);
+        });
+        select.addEventListener('change', refreshAutoBuildSkillOptions);
+    });
+}
+
+/**
+ * 重新整理各優先技能下拉選單的可用選項，防止重複選擇
+ */
+function refreshAutoBuildSkillOptions() {
+    const selectedValues = AUTO_PRIORITY_IDS.map(id => {
+        const el = document.getElementById(id);
+        return el ? el.value : '';
+    }).filter(v => v);
+
+    AUTO_PRIORITY_IDS.forEach(id => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        const currentVal = select.value;
+        const othersSelected = selectedValues.filter(v => v !== currentVal);
+        Array.from(select.options).forEach(opt => {
+            opt.disabled = opt.value ? othersSelected.includes(opt.value) : false;
+        });
+    });
+}
+
+/**
+ * 執行自動配裝：收集選項並呼叫 API
+ */
+function triggerAutoBuild() {
+    const prioritySkills = AUTO_PRIORITY_IDS
+        .map(id => { const el = document.getElementById(id); return el ? el.value : ''; })
+        .filter(v => v);
+
+    if (!prioritySkills.length) {
+        alert('請至少選擇一個優先技能');
+        return;
+    }
+
+    const profession = document.getElementById('professionSelect').value || '通用';
+    const isSailor = document.getElementById('sailorCheckbox')?.checked || false;
+    const skillCap = parseInt(document.getElementById('autoSkillCap').value, 10) || 25;
+    const excludeQuality = document.getElementById('autoPoorMode')?.checked || false;
+
+    const resultsDiv = document.getElementById('autoBuildResults');
+    resultsDiv.innerHTML = '<p>計算中…</p>';
+    resultsDiv.style.display = 'block';
+
+    fetch('/api/character/suggest-builds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            profession,
+            priority_skills: prioritySkills,
+            is_sailor: isSailor,
+            top_n: 5,
+            candidates_per_slot: 3,
+            skill_cap: skillCap,
+            exclude_quality: excludeQuality
+        })
+    })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) {
+                resultsDiv.innerHTML = `<p class="error">${escapeHtml(data.error)}</p>`;
+                return;
+            }
+            displayAutoBuildResults(data.plans, prioritySkills);
+        })
+        .catch(err => {
+            console.error(err);
+            resultsDiv.innerHTML = '<p class="error">自動配裝失敗，請稍後再試</p>';
+        });
+}
+
+/**
+ * 顯示自動配裝建議方案
+ * @param {Array} plans 方案列表
+ * @param {string[]} prioritySkills 優先技能
+ */
+function displayAutoBuildResults(plans, prioritySkills) {
+    state.autoBuildPlans = plans;
+    const container = document.getElementById('autoBuildResults');
+
+    if (!plans || !plans.length) {
+        container.innerHTML = '<p class="error">找不到符合條件的配裝方案</p>';
+        container.style.display = 'block';
+        return;
+    }
+
+    const skillCols = prioritySkills.map(s => `<th>${escapeHtml(s)}</th>`).join('');
+    const rows = plans.map((plan, i) => {
+        const skillVals = prioritySkills
+            .map(s => `<td>${escapeHtml(String(plan.priority_values[s] || 0))}</td>`)
+            .join('');
+        const eqList = plan.equipment_names.map(e => escapeHtml(e)).join('、');
+        return `<tr>
+            <td>方案 ${i + 1}</td>
+            ${skillVals}
+            <td class="auto-build-eq-cell">${eqList}</td>
+            <td><button class="btn btn-primary auto-build-apply-btn" data-plan-index="${i}">套用</button></td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="auto-build-results-header">
+            共 ${plans.length} 套方案　優先技能：${prioritySkills.map(s => escapeHtml(s)).join(' ＞ ')}
+        </div>
+        <table class="auto-build-table">
+            <thead>
+                <tr>
+                    <th>方案</th>
+                    ${skillCols}
+                    <th>裝備清單</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+        <p class="auto-build-hint">點擊「套用」可將方案填入角色配裝欄位</p>
+    `;
+    container.style.display = 'block';
+    container.scrollIntoView({ behavior: 'smooth' });
+}
+
+/**
+ * 將自動配裝方案套用至角色配裝欄位
+ * @param {number} index 方案索引
+ */
+function applyAutoBuildPlan(index) {
+    const plans = state.autoBuildPlans;
+    if (!plans || index >= plans.length) return;
+    const equipmentNames = plans[index].equipment_names;
+
+    // 建立裝備名稱 → 位置對應表（由 character options 取得）
+    const nameToPos = {};
+    if (state.characterOptions && state.characterOptions.equipment_by_position) {
+        Object.entries(state.characterOptions.equipment_by_position).forEach(([pos, names]) => {
+            names.forEach(name => { nameToPos[name] = pos; });
+        });
+    }
+
+    // 建立位置 → 待分配裝備名稱清單
+    const posToNames = {};
+    equipmentNames.forEach(name => {
+        const pos = nameToPos[name];
+        if (pos) {
+            if (!posToNames[pos]) posToNames[pos] = [];
+            posToNames[pos].push(name);
+        }
+    });
+
+    // 依序分配至各槽位選單
+    const posAssigned = {};
+    document.querySelectorAll('#characterEquipmentForm select').forEach(sel => {
+        const pos = sel.dataset.position;
+        const names = posToNames[pos] || [];
+        const idx = posAssigned[pos] || 0;
+
+        if (idx < names.length) {
+            sel.value = names[idx];
+            posAssigned[pos] = idx + 1;
+        } else {
+            sel.value = '';
+        }
+        updateSlotColor(sel);
+    });
+
+    calculateCharacterSkills();
+    document.getElementById('characterEquipmentForm').scrollIntoView({ behavior: 'smooth' });
 }
