@@ -472,6 +472,10 @@ select.slot-boarding {
     margin-bottom: 12px;
 }
 
+.character-skills-block-bottom {
+    margin-top: 18px;
+}
+
 .character-skills-block h4 {
     margin-bottom: 10px;
     color: #444;
