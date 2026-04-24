@@ -714,15 +714,21 @@ function displayCharacterResults(data) {
             <ul class="char-selected-list">${selectedEquipmentHtml}</ul>
             ${invalidEquipmentHtml ? `<div class="error">未找到裝備：<ul>${invalidEquipmentHtml}</ul></div>` : ''}
         </div>
-        <div class="character-skills-block">
+    `;
+
+    // ── 技能分解總覽放在頁面最下方 ───────────────────────────────────────
+    const breakdownSection = document.getElementById('skillBreakdownSection');
+    if (breakdownSection) {
+        breakdownSection.innerHTML = `
             <h4>技能分解總覽</h4>
             <div class="skill-legend">
                 <span class="skill-legend-item legend-cannon">■ 砲術系</span>
                 <span class="skill-legend-item legend-boarding">■ 白兵系</span>
             </div>
             ${tableHtml}
-        </div>
-    `;
+        `;
+        breakdownSection.style.display = 'block';
+    }
 
     container.style.display = 'block';
     if (wasHidden) {
