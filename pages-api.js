@@ -435,24 +435,75 @@
         };
         dfs(0, new Array(k + 1).fill(0), [], 0);
 
-        // 每種「技能輪廓」只留最佳的一套，讓回傳的方案彼此真的不同
-        const cutoff = bestTotal - TOLERANCE;
-        const ordered = [...byProfile.values()]
-            .filter(x => x.total >= cutoff)
-            .sort((a, b) => compareTuples(b.scoreKey, a.scoreKey));
+        // 上面那輪求的是「生效總和最大」，會為了總分犧牲第一順位技能。
+        // 但使用者填的優先技能是有先後的，所以另外找一套嚴格照順序的方案：
+        // 先把第一順位頂到最高，在此前提下再衝第二順位，依此類推。
+        let bestLex = null;
+        const dfsLex = (i, acc, chosen, start) => {
+            if (i === n) {
+                const names = chosen.filter(e => e !== null).map(e => e.name);
+                const uniq = names.filter(x => x.includes('(唯一)')).map(x => x.replace('(質變)', ''));
+                if (uniq.length !== new Set(uniq).size) return;
+                const profile = [];
+                for (let j = 0; j < k; j++) profile.push(Math.min(base[j] + acc[j], target));
+                if (!bestLex || compareTuples(profile, bestLex.profile) > 0) {
+                    bestLex = { profile, names };
+                }
+                return;
+            }
+            // 各分量都取樂觀上界後仍字典序落後，這支就不可能更好（上界單調）
+            if (bestLex) {
+                const upper = [];
+                for (let j = 0; j < k; j++) {
+                    upper.push(Math.min(base[j] + acc[j] + maxRemain[i][j], target));
+                }
+                if (compareTuples(upper, bestLex.profile) < 0) return;
+            }
+            const candidates = slotCandidates[i];
+            for (let idx = sameAsPrev[i] ? start : 0; idx < candidates.length; idx++) {
+                const [v, eq] = candidates[idx];
+                const next = new Array(k + 1);
+                for (let j = 0; j <= k; j++) next[j] = acc[j] + v[j];
+                chosen.push(eq);
+                dfsLex(i + 1, next, chosen, idx);
+                chosen.pop();
+            }
+        };
+        dfsLex(0, new Array(k + 1).fill(0), [], 0);
 
-        const results = [];
-        for (const { scoreKey, names } of ordered.slice(0, topN)) {
+        const makePlan = (names, byOrder) => {
             const skillResult = calcCharacterSkills(data, profession, names, isSailor);
             const highest = skillResult.highest_skills || {};
             const priorityValues = {};
             for (const s of pSkills) priorityValues[s] = Math.min(highest[s] || 0, target);
-            results.push({
+            const vals = Object.values(priorityValues);
+            return {
                 equipment_names: names,
-                score_key: scoreKey,
+                score_key: [vals.reduce((a, b) => a + b, 0), ...vals],
                 priority_values: priorityValues,
+                by_priority_order: byOrder,
                 skill_result: skillResult
-            });
+            };
+        };
+
+        // 每種「技能輪廓」只留最佳的一套，讓回傳的方案彼此真的不同
+        const cutoff = bestTotal - TOLERANCE;
+        const ordered = [...byProfile.entries()]
+            .filter(([, x]) => x.total >= cutoff)
+            .sort((a, b) => compareTuples(b[1].scoreKey, a[1].scoreKey));
+
+        const results = [];
+        const seenProfiles = new Set();
+        // 照優先順序的那套放第一個
+        if (bestLex) {
+            results.push(makePlan(bestLex.names, true));
+            seenProfiles.add(bestLex.profile.join(','));
+        }
+        for (const [profileKey, { names }] of ordered) {
+            if (results.length >= topN) break;
+            if (seenProfiles.has(profileKey)) continue;
+            seenProfiles.add(profileKey);
+            results.push(makePlan(names, false));
         }
         return results;
     }

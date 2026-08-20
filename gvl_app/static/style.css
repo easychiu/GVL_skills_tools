@@ -1007,6 +1007,28 @@ select.slot-boarding {
     border-left: 4px solid #3c3;
 }
 
+/* 自動配裝方案標籤 */
+.auto-build-tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.78em;
+    font-weight: 700;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.auto-build-tag-order {
+    background: #ffe9c7;
+    color: #8a5a00;
+}
+
+.auto-build-tag-overall {
+    background: #d4edda;
+    color: #155724;
+}
+
 /* ── 手機版排版（≤600px）─────────────────────────────────────────────
    手機是主要使用情境之一。重點：把被內距吃掉的寬度要回來、觸控目標放大到
    44px、拿掉純裝飾的空佔位、把寬表格改成卡片。放在檔案最後以覆蓋前面規則。 */

@@ -1015,13 +1015,27 @@ function displayAutoBuildResults(plans, prioritySkills) {
         .map(s => `<th title="最高值：角色上限＋加成，超過上限以上限計">${escapeHtml(s)}</th>`)
         .join('');
     // data-label 供手機版把表格轉成卡片時顯示欄位名（CSS ::before 取用）
+    // 標籤：照使用者優先順序最佳的那套 vs 生效總和最高的那套（可能是同一套）
+    const totalOf = p => Object.values(p.priority_values || {}).reduce((a, b) => a + b, 0);
+    const maxTotal = Math.max(...plans.map(totalOf));
+    let overallMarked = false;
+
     const rows = plans.map((plan, i) => {
+        const tags = [];
+        if (plan.by_priority_order) tags.push('順序最高');
+        if (!overallMarked && totalOf(plan) === maxTotal) {
+            tags.push('綜合最高');
+            overallMarked = true;
+        }
+        const tagHtml = tags
+            .map(t => `<span class="auto-build-tag auto-build-tag-${t === '順序最高' ? 'order' : 'overall'}">${t}</span>`)
+            .join('');
         const skillVals = prioritySkills
             .map(s => `<td class="auto-build-skill-cell" data-label="${escapeHtml(s)}">${escapeHtml(String(plan.priority_values[s] || 0))}</td>`)
             .join('');
         const eqList = plan.equipment_names.map(e => escapeHtml(e)).join('、');
         return `<tr>
-            <td class="auto-build-plan-cell">方案 ${i + 1}</td>
+            <td class="auto-build-plan-cell">方案 ${i + 1}${tagHtml}</td>
             ${skillVals}
             <td class="auto-build-eq-cell" data-label="裝備">${eqList}</td>
             <td class="auto-build-action-cell"><button class="btn btn-primary auto-build-apply-btn" data-plan-index="${i}">套用</button></td>

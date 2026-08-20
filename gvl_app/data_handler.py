@@ -579,26 +579,69 @@ class GVLDataHandler:
 
         _dfs(0, [0] * (k + 1), [], 0)
 
-        # 每種「技能輪廓」只留最佳的一套，讓回傳的方案彼此真的不同
-        cutoff = best_total - tolerance
-        ordered = sorted(
-            (x for prof_key, x in by_profile.items() if sum(prof_key) >= cutoff),
-            key=lambda x: x[0],
-            reverse=True,
-        )
+        # 上面那輪求的是「生效總和最大」，會為了總分犧牲第一順位技能。
+        # 但使用者填的優先技能是有先後的，所以另外找一套嚴格照順序的方案：
+        # 先把第一順位頂到最高，在此前提下再衝第二順位，依此類推。
+        best_lex: Optional[tuple] = None
 
-        results: List[Dict[str, Any]] = []
-        for score_key, names in ordered[:top_n]:
+        def _dfs_lex(i: int, acc: List[int], chosen: List[Optional[dict]], start: int):
+            nonlocal best_lex
+            if i == n:
+                names = [e['name'] for e in chosen if e is not None]
+                uniq = [x.replace('(質變)', '') for x in names if '(唯一)' in x]
+                if len(uniq) != len(set(uniq)):
+                    return
+                profile = tuple(min(base[j] + acc[j], target) for j in range(k))
+                if best_lex is None or profile > best_lex[0]:
+                    best_lex = (profile, names)
+                return
+            # 各分量都取樂觀上界後仍字典序落後，這支就不可能更好（上界單調）
+            upper = tuple(
+                min(base[j] + acc[j] + max_remain[i][j], target) for j in range(k)
+            )
+            if best_lex is not None and upper < best_lex[0]:
+                return
+            begin = start if same_as_prev[i] else 0
+            candidates = slot_candidates[i]
+            for idx in range(begin, len(candidates)):
+                v, eq = candidates[idx]
+                _dfs_lex(i + 1, [acc[j] + v[j] for j in range(k + 1)], chosen + [eq], idx)
+
+        _dfs_lex(0, [0] * (k + 1), [], 0)
+
+        def _make(names: List[str], by_order: bool) -> Dict[str, Any]:
             skill_result = self.calculate_character_skills(
                 profession, names, is_sailor=is_sailor
             )
             highest = skill_result.get('highest_skills', {})
-            results.append({
+            values = {s: min(highest.get(s, 0), target) for s in p_skills}
+            return {
                 'equipment_names': names,
-                'score_key': score_key,
-                'priority_values': {
-                    s: min(highest.get(s, 0), target) for s in p_skills
-                },
+                'score_key': (sum(values.values()), *values.values()),
+                'priority_values': values,
+                'by_priority_order': by_order,
                 'skill_result': skill_result,
-            })
+            }
+
+        # 每種「技能輪廓」只留最佳的一套，讓回傳的方案彼此真的不同
+        cutoff = best_total - tolerance
+        ordered = sorted(
+            ((prof_key, x) for prof_key, x in by_profile.items() if sum(prof_key) >= cutoff),
+            key=lambda item: item[1][0],
+            reverse=True,
+        )
+
+        results: List[Dict[str, Any]] = []
+        seen_profiles = set()
+        # 照優先順序的那套放第一個
+        if best_lex is not None:
+            results.append(_make(best_lex[1], True))
+            seen_profiles.add(best_lex[0])
+        for prof_key, (_score_key, names) in ordered:
+            if len(results) >= top_n:
+                break
+            if prof_key in seen_profiles:
+                continue
+            seen_profiles.add(prof_key)
+            results.append(_make(names, False))
         return results
