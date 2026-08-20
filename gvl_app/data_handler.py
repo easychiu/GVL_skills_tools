@@ -151,7 +151,8 @@ class GVLDataHandler:
     def _load_skill_caps_from_source(self) -> Dict[str, Dict[str, int]]:
         """從資料源位置=角色上限載入技能上限"""
         df = self.data['source']
-        cap_rows = df[df['位置'] == '角色上限'].dropna(how='all')
+        # 角色上限區塊只有首列的位置欄有標籤，其後各職業列為空白，需先向下填補
+        cap_rows = df[df['位置'].ffill() == '角色上限'].dropna(how='all')
         if cap_rows.empty:
             return {}
 
