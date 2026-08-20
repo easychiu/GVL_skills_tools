@@ -33,12 +33,20 @@ const DUPLICATE_SLOT_COUNT = 2;
 const CANNON_SKILLS = new Set(['炮術', '水平射擊', '彈道學', '貫穿', '速射']);
 const BOARDING_SKILLS = new Set(['突擊', '戰術', '射擊']);
 
-// 一鍵套用的優先技能組合；同時作為下拉選單的 optgroup 分組
-// 未列入的技能會自動歸到「其他」分組，純顯示用，不影響任何計算
+// 一鍵套用的優先技能組合。只有 5 個優先技能欄位，所以每組最多 5 個技能
 const SKILL_PRESETS = [
     ['砲術裝備', ['炮術', '水平射擊', '彈道學', '貫穿', '速射']],
     ['冒險陸戰', ['迅捷', '識破', '猛擊']],
     ['海事白兵', ['劍術', '突擊', '戰術', '射擊', '防禦']]
+];
+
+// 下拉選單的 optgroup 分組。範圍比一鍵組合大——分組不受 5 個欄位的限制，
+// 例如齊射屬砲術類但一鍵組合已滿。未列入的技能會歸到「其他」。
+// 純顯示用，不影響任何計算。
+const SKILL_GROUPS = [
+    ['砲術類', ['炮術', '水平射擊', '彈道學', '貫穿', '速射', '齊射']],
+    ['冒險類', ['迅捷', '識破', '猛擊', '搜尋']],
+    ['白兵類', ['劍術', '突擊', '戰術', '射擊', '防禦']]
 ];
 
 /**
@@ -889,11 +897,11 @@ function renderAutoBuildSkillDropdowns(skills) {
  */
 function groupSkillsForDropdown(skills) {
     const available = new Set(skills);
-    const groups = SKILL_PRESETS
+    const groups = SKILL_GROUPS
         .map(([label, members]) => [label, members.filter(s => available.has(s))])
         .filter(([, members]) => members.length > 0);
 
-    const classified = new Set(SKILL_PRESETS.flatMap(([, members]) => members));
+    const classified = new Set(SKILL_GROUPS.flatMap(([, members]) => members));
     const rest = skills.filter(s => !classified.has(s));
     if (rest.length) groups.push(['其他', rest]);
     return groups;
