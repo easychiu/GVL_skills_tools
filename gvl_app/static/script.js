@@ -33,11 +33,25 @@ const DUPLICATE_SLOT_COUNT = 2;
 const CANNON_SKILLS = new Set(['炮術', '水平射擊', '彈道學', '貫穿', '速射']);
 const BOARDING_SKILLS = new Set(['突擊', '戰術', '射擊']);
 
-// 一鍵套用的優先技能組合。只有 5 個優先技能欄位，所以每組最多 5 個技能
+// 一鍵套用的優先技能組合，連同該路線常用的職業一起帶入。
+// 只有 5 個優先技能欄位，所以每組最多 5 個技能。
+// profession 必須與資料源的職業名稱完全相同，否則會靜默套用失敗。
 const SKILL_PRESETS = [
-    ['砲術裝備', ['炮術', '水平射擊', '彈道學', '貫穿', '速射']],
-    ['冒險陸戰', ['迅捷', '識破', '猛擊']],
-    ['海事白兵', ['劍術', '突擊', '戰術', '射擊', '防禦']]
+    {
+        name: '砲術裝備',
+        profession: '大提督/打撈者',
+        skills: ['炮術', '水平射擊', '彈道學', '貫穿', '速射']
+    },
+    {
+        name: '冒險陸戰',
+        profession: '大海盜/藥劑師/遊俠',
+        skills: ['迅捷', '識破', '猛擊']
+    },
+    {
+        name: '海事白兵',
+        profession: '大海盜/藥劑師/遊俠',
+        skills: ['劍術', '突擊', '戰術', '射擊', '防禦']
+    }
 ];
 
 // 下拉選單的 optgroup 分組。範圍比一鍵組合大——分組不受 5 個欄位的限制，
@@ -103,6 +117,8 @@ const CHANGELOG = [
         version: 'v2026.08.20',
         items: [
             '網頁版上線：免安裝、手機可直接用',
+            '一鍵套用會連職業一起帶入：砲術裝備→大提督／打撈者，冒險陸戰與海事白兵→大海盜／藥劑師／遊俠',
+            '航海士預設打勾',
             '自動配裝改用可證明最佳解的搜尋，同時提供「順序最高」與「綜合最高」兩種方案',
             '自動配裝以遊戲內最高值（角色上限＋裝備＋航海士）為目標，不再把技能堆過 25 浪費',
             '新增一鍵套用：砲術裝備／冒險陸戰／海事白兵',
@@ -974,15 +990,22 @@ function groupSkillsForDropdown(skills) {
  * @param {string} presetName 組合名稱（對應按鈕的 data-preset）
  */
 function applySkillPreset(presetName) {
-    const preset = SKILL_PRESETS.find(([label]) => label === presetName);
+    const preset = SKILL_PRESETS.find(p => p.name === presetName);
     if (!preset) return;
 
-    const [, members] = preset;
     AUTO_PRIORITY_IDS.forEach((id, index) => {
         const select = document.getElementById(id);
         if (!select) return;
-        select.value = members[index] || '';
+        select.value = preset.skills[index] || '';
     });
+
+    // 一併帶入該路線常用的職業；找不到就維持現狀，不要靜默切成別的職業
+    const profSelect = document.getElementById('professionSelect');
+    if (profSelect && [...profSelect.options].some(o => o.value === preset.profession)) {
+        profSelect.value = preset.profession;
+        profSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
     refreshAutoBuildSkillOptions();
     triggerAutoBuild();
 }

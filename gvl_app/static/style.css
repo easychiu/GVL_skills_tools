@@ -1266,7 +1266,10 @@ select.slot-boarding {
         margin-top: 8px;
     }
 
-    /* 技能分解總覽：不再隱藏欄位，改為可橫向捲動，資料才不會看不到 */
+    /* 技能分解總覽：不再隱藏欄位，改為可橫向捲動，資料才不會看不到。
+       捲動要掛在表格的實際父容器 #skillBreakdownSection——技能總覽已搬到
+       頁面下方，不在 .character-results-card 裡；而 .container 是
+       overflow-x: hidden，掛錯地方表格會被裁掉且捲不到。 */
     .skill-result-table th:nth-child(5),
     .skill-result-table td:nth-child(5),
     .skill-result-table th:nth-child(6),
@@ -1274,6 +1277,7 @@ select.slot-boarding {
         display: table-cell;
     }
 
+    #skillBreakdownSection,
     .character-results-card {
         overflow-x: auto;
     }
