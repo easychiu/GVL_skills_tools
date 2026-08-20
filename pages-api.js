@@ -368,7 +368,10 @@
         const seenSig = new Set();
         for (const combo of cartesianProduct(slotCandidates)) {
             const eqNames = combo.filter(eq => eq !== null).map(eq => eq.name);
-            const uniqueOnly = eqNames.filter(n => n.includes('(唯一)'));
+            // 唯一裝備只會有一件，質變版與原版視為同一件（去掉「(質變)」後比對）
+            const uniqueOnly = eqNames
+                .filter(n => n.includes('(唯一)'))
+                .map(n => n.replace('(質變)', ''));
             if (uniqueOnly.length !== new Set(uniqueOnly).size) continue;
             // 簽章分隔符是 NUL（非空白）：裝備名稱不可能含 NUL，串接後不會與其他組合碰撞
             const sig = eqNames.slice().sort(zhCompare).join('\u0000');

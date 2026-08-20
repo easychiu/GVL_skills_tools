@@ -29,8 +29,17 @@ const DEFAULT_SLOT_SIDE = 'right';
 const DUPLICATE_SLOT_COUNT = 2;
 
 // 裝備類型判斷：砲術系 vs 白兵(跳幫)系
-const CANNON_SKILLS = new Set(['砲術', '水平', '彈道', '貫穿', '速射']);
+// 名稱必須與資料源的技能欄位完全一致（是「炮術」不是「砲術」、「水平射擊」不是「水平」）
+const CANNON_SKILLS = new Set(['炮術', '水平射擊', '彈道學', '貫穿', '速射']);
 const BOARDING_SKILLS = new Set(['突擊', '戰術', '射擊']);
+
+// 一鍵套用的優先技能組合；同時作為下拉選單的 optgroup 分組
+// 未列入的技能會自動歸到「其他」分組，純顯示用，不影響任何計算
+const SKILL_PRESETS = [
+    ['砲術裝備', ['炮術', '水平射擊', '彈道學', '貫穿', '速射']],
+    ['冒險陸戰', ['迅捷', '識破', '猛擊']],
+    ['海事白兵', ['劍術', '突擊', '戰術', '射擊', '防禦']]
+];
 
 /**
  * 依技能判斷裝備類型：cannon（砲術系）、boarding（白兵系）或 neutral
@@ -88,6 +97,17 @@ function initializePage() {
     loadStats();
     setupTabHandlers();
     setupAutoBuilderListeners();
+    setupEquipmentFilter();
+}
+
+// 設置裝備頁的位置篩選
+function setupEquipmentFilter() {
+    const filter = document.getElementById('equipmentPositionFilter');
+    if (!filter) return;
+    filter.addEventListener('change', function () {
+        state.currentPage = 1;
+        loadEquipmentPage();
+    });
 }
 
 // 設置標籤處理器
@@ -124,12 +144,16 @@ function loadPositions() {
     fetch('/api/positions')
         .then(response => response.json())
         .then(data => {
-            const select = document.getElementById('positionSelect');
-            data.positions.forEach(position => {
-                const option = document.createElement('option');
-                option.value = position;
-                option.textContent = position;
-                select.appendChild(option);
+            // 搜索頁的位置下拉，以及裝備頁的位置篩選，兩者選項相同
+            ['positionSelect', 'equipmentPositionFilter'].forEach(id => {
+                const select = document.getElementById(id);
+                if (!select) return;
+                data.positions.forEach(position => {
+                    const option = document.createElement('option');
+                    option.value = position;
+                    option.textContent = position;
+                    select.appendChild(option);
+                });
             });
         })
         .catch(error => console.error('Error loading positions:', error));
@@ -262,6 +286,24 @@ function displaySearchResults(data) {
 
 // 加載裝備頁面
 function loadEquipmentPage() {
+    const position = document.getElementById('equipmentPositionFilter')?.value || '';
+    const pagination = document.getElementById('equipmentPagination');
+
+    // 篩選特定位置時，該位置裝備最多不到百件，直接一次列出、不分頁
+    if (position) {
+        fetch(`/api/search?q=${encodeURIComponent(position)}&type=position`)
+            .then(response => response.json())
+            .then(data => {
+                displayEquipmentGrid(data.results);
+                document.getElementById('equipmentCount').textContent =
+                    `${position}：共 ${data.count} 件裝備`;
+                if (pagination) pagination.style.display = 'none';
+            })
+            .catch(error => console.error('Error loading equipment:', error));
+        return;
+    }
+
+    if (pagination) pagination.style.display = '';
     fetch(`/api/equipment?page=${state.currentPage}&per_page=${state.perPage}`)
         .then(response => response.json())
         .then(data => {
@@ -788,6 +830,17 @@ function setupAutoBuilderListeners() {
         triggerBtn.addEventListener('click', triggerAutoBuild);
     }
 
+    // 事件委派：一鍵套用技能組合的按鈕
+    const presetRow = document.querySelector('.auto-build-preset-row');
+    if (presetRow) {
+        presetRow.addEventListener('click', function (e) {
+            const btn = e.target.closest('.auto-preset-btn');
+            if (btn) {
+                applySkillPreset(btn.dataset.preset);
+            }
+        });
+    }
+
     // 事件委派：捕捉結果表格中各方案的「套用」按鈕
     const resultsDiv = document.getElementById('autoBuildResults');
     if (resultsDiv) {
@@ -805,19 +858,64 @@ function setupAutoBuilderListeners() {
  * @param {string[]} skills 所有技能列表
  */
 function renderAutoBuildSkillDropdowns(skills) {
+    const groups = groupSkillsForDropdown(skills);
     AUTO_PRIORITY_IDS.forEach(id => {
         const select = document.getElementById(id);
         if (!select) return;
-        // Keep the first '（不選）' option and replace the rest
-        while (select.options.length > 1) select.remove(1);
-        skills.forEach(skill => {
-            const opt = document.createElement('option');
-            opt.value = skill;
-            opt.textContent = skill;
-            select.appendChild(opt);
+        // 保留第一個「（不選）」，其餘（含 optgroup）整個重建
+        while (select.lastElementChild && select.lastElementChild !== select.firstElementChild) {
+            select.removeChild(select.lastElementChild);
+        }
+        groups.forEach(([label, members]) => {
+            const group = document.createElement('optgroup');
+            group.label = label;
+            members.forEach(skill => {
+                const opt = document.createElement('option');
+                opt.value = skill;
+                opt.textContent = skill;
+                group.appendChild(opt);
+            });
+            select.appendChild(group);
         });
         select.addEventListener('change', refreshAutoBuildSkillOptions);
     });
+}
+
+/**
+ * 依 SKILL_GROUPS 將技能分組供 optgroup 使用
+ * 不在分類表內的技能一律歸「其他」，避免資料源新增技能時從下拉中消失
+ * @param {string[]} skills 所有技能列表
+ * @returns {Array<[string, string[]]>} [分類名稱, 該類技能] 陣列
+ */
+function groupSkillsForDropdown(skills) {
+    const available = new Set(skills);
+    const groups = SKILL_PRESETS
+        .map(([label, members]) => [label, members.filter(s => available.has(s))])
+        .filter(([, members]) => members.length > 0);
+
+    const classified = new Set(SKILL_PRESETS.flatMap(([, members]) => members));
+    const rest = skills.filter(s => !classified.has(s));
+    if (rest.length) groups.push(['其他', rest]);
+    return groups;
+}
+
+/**
+ * 套用一鍵技能組合：填入前 N 個優先技能欄位、其餘清空，並立即執行自動配裝
+ * @param {string} presetName 組合名稱（對應按鈕的 data-preset）
+ */
+function applySkillPreset(presetName) {
+    const preset = SKILL_PRESETS.find(([label]) => label === presetName);
+    if (!preset) return;
+
+    const [, members] = preset;
+    AUTO_PRIORITY_IDS.forEach((id, index) => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        select.disabled = false;
+        select.value = members[index] || '';
+    });
+    refreshAutoBuildSkillOptions();
+    triggerAutoBuild();
 }
 
 /**

@@ -2,6 +2,12 @@
 
 大航海時代傳說 的裝備配裝計算工具，提供桌面 GUI 圖形介面，支援角色配裝技能計算與裝備搜尋。
 
+## 🌐 線上版（免安裝，手機也能開）
+
+### **https://easychiu.github.io/GVL_skills_tools/**
+
+開網頁就能用，配裝計算全在瀏覽器端完成，不需要架伺服器。
+
 ## 🚀 快速開始
 
 ### 1. 安裝依賴
@@ -58,7 +64,19 @@ python main.py cli search --skill "炮術" --min-level 2
 
 若只想本機存取，改用：`python main.py web --host 127.0.0.1`
 
-## ☁️ 公開部署（Render）
+## ☁️ 公開部署
+
+### GitHub Pages（目前線上版採用）
+
+`main` 分支根目錄即為 Pages 來源，推上去就會自動建置，不需要伺服器。
+
+**改完 `GVL裝備表.xlsx` 後必須重跑下列指令**，重新產生 `data.json` 與根目錄 `index.html`，網站資料才會更新：
+
+```bash
+python export_static_data.py
+```
+
+### Render（需要後端時）
 
 ### 一鍵部署
 
@@ -98,7 +116,7 @@ python main.py cli search --skill "炮術" --min-level 2
 
 ## 📊 資料規模
 
-- **總裝備數**: 56 件
+- **總裝備數**: 291 件
 - **位置類型**: 8 種
 - **技能種類**: 24 種
 

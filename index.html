@@ -17,15 +17,15 @@
 
         <!-- 導航標籤 -->
         <div class="tabs">
-            <button class="tab-btn active" data-tab="search">搜索</button>
+            <button class="tab-btn active" data-tab="character">角色配裝</button>
+            <button class="tab-btn" data-tab="search">搜索</button>
             <button class="tab-btn" data-tab="equipment">裝備</button>
-            <button class="tab-btn" data-tab="character">角色</button>
             <button class="tab-btn" data-tab="config">配置</button>
             <button class="tab-btn" data-tab="stats">統計</button>
         </div>
 
         <!-- 搜索頁面 -->
-        <div id="search" class="tab-content active">
+        <div id="search" class="tab-content">
             <h2>搜索裝備</h2>
             
             <div class="search-section">
@@ -68,23 +68,35 @@
             <h2>所有裝備</h2>
             <div class="info-bar">
                 <span id="equipmentCount">加載中...</span>
+                <label class="equipment-filter-label">
+                    位置：
+                    <select id="equipmentPositionFilter" class="search-input">
+                        <option value="">全部</option>
+                    </select>
+                </label>
             </div>
             <div id="equipmentList" class="equipment-grid"></div>
-            <div class="pagination-controls">
+            <div id="equipmentPagination" class="pagination-controls">
                 <button onclick="previousPage()" class="btn">‹ 上一頁</button>
                 <span id="pageInfo"></span>
                 <button onclick="nextPage()" class="btn">下一頁 ›</button>
             </div>
         </div>
 
-        <!-- 角色頁面 -->
-        <div id="character" class="tab-content">
+        <!-- 角色頁面（預設首頁） -->
+        <div id="character" class="tab-content active">
             <h2>角色配裝</h2>
 
             <!-- 自動配裝面板 -->
             <div class="auto-build-panel">
                 <div class="auto-build-header">⚡ 自動配裝</div>
                 <div class="auto-build-controls">
+                    <div class="auto-build-preset-row">
+                        <span class="auto-build-label">一鍵套用：</span>
+                        <button type="button" class="btn auto-preset-btn" data-preset="砲術裝備">砲術裝備</button>
+                        <button type="button" class="btn auto-preset-btn" data-preset="冒險陸戰">冒險陸戰</button>
+                        <button type="button" class="btn auto-preset-btn" data-preset="海事白兵">海事白兵</button>
+                    </div>
                     <div class="auto-build-skills-row">
                         <span class="auto-build-label">優先技能：</span>
                         <select id="autoPriority1" class="search-input auto-skill-select"><option value="">（不選）</option></select>

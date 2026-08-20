@@ -12,7 +12,7 @@ sys.path.insert(0, str(_THIS_DIR))
 from data_handler import GVLDataHandler  # noqa: E402
 
 # ─── 技能分類關鍵字 ───────────────────────────────────────────────────────
-CANNON_KEYWORDS   = {'砲術', '水平', '彈道', '貫穿', '速射'}
+CANNON_KEYWORDS   = {'炮術', '水平', '彈道', '貫穿', '速射'}
 BOARDING_KEYWORDS = {'突擊', '戰術', '射擊'}
 
 # ─── 配色 ────────────────────────────────────────────────────────────────

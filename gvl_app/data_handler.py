@@ -499,8 +499,11 @@ class GVLDataHandler:
                 if eq is None:
                     continue
                 eq_names.append(eq['name'])
-            # 名稱含「(唯一)」的裝備不可重複裝備
-            unique_names = [n for n in eq_names if '(唯一)' in n]
+            # 名稱含「(唯一)」的裝備不可重複裝備；唯一裝備只會有一件，
+            # 因此質變版與原版視為同一件（去掉「(質變)」後比對）
+            unique_names = [
+                n.replace('(質變)', '') for n in eq_names if '(唯一)' in n
+            ]
             if len(unique_names) != len(set(unique_names)):
                 continue
             sig = tuple(sorted(eq_names))
