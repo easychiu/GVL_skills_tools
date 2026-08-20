@@ -76,7 +76,7 @@ response = client.post(
     '/api/character/suggest-builds',
     json={
         'profession': '大提督',
-        'priority_skills': ['砲術', '彈道學'],
+        'priority_skills': ['炮術', '彈道學'],
         'is_sailor': True,
         'top_n': 2,
         'candidates_per_slot': 2,
