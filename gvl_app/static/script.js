@@ -1014,16 +1014,17 @@ function displayAutoBuildResults(plans, prioritySkills) {
     const skillCols = prioritySkills
         .map(s => `<th title="最高值：角色上限＋加成，超過上限以上限計">${escapeHtml(s)}</th>`)
         .join('');
+    // data-label 供手機版把表格轉成卡片時顯示欄位名（CSS ::before 取用）
     const rows = plans.map((plan, i) => {
         const skillVals = prioritySkills
-            .map(s => `<td>${escapeHtml(String(plan.priority_values[s] || 0))}</td>`)
+            .map(s => `<td class="auto-build-skill-cell" data-label="${escapeHtml(s)}">${escapeHtml(String(plan.priority_values[s] || 0))}</td>`)
             .join('');
         const eqList = plan.equipment_names.map(e => escapeHtml(e)).join('、');
         return `<tr>
-            <td>方案 ${i + 1}</td>
+            <td class="auto-build-plan-cell">方案 ${i + 1}</td>
             ${skillVals}
-            <td class="auto-build-eq-cell">${eqList}</td>
-            <td><button class="btn btn-primary auto-build-apply-btn" data-plan-index="${i}">套用</button></td>
+            <td class="auto-build-eq-cell" data-label="裝備">${eqList}</td>
+            <td class="auto-build-action-cell"><button class="btn btn-primary auto-build-apply-btn" data-plan-index="${i}">套用</button></td>
         </tr>`;
     }).join('');
 
