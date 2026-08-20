@@ -39,9 +39,10 @@ data = {
 
 data_json_path = ROOT / 'data.json'
 with open(data_json_path, 'w', encoding='utf-8') as f:
-    # sort_keys 讓輸出穩定：技能來自 set，每次執行的迭代順序都不同，
-    # 不排序的話即使資料沒變，每次匯出都會產生數百行無意義的 git diff
-    json.dump(data, f, ensure_ascii=False, indent=2, sort_keys=True)
+    # 不可用 sort_keys：那會把職業順序也重排，職業下拉選單依賴資料源的排列
+    # （通用在最前、其餘照 Excel 順序）。輸出的確定性改在 data_handler
+    # 以 sorted(self.skills) 解決技能來自 set 的迭代順序不穩問題。
+    json.dump(data, f, ensure_ascii=False, indent=2)
 
 # ---- 2. 匯出 index.html ----
 html = (APP_DIR / 'templates' / 'index.html').read_text(encoding='utf-8')

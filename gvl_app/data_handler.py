@@ -92,7 +92,7 @@ class GVLDataHandler:
                 }
                 
                 # 提取技能信息
-                for skill in self.skills:
+                for skill in sorted(self.skills):
                     if skill in row:
                         val = row[skill]
                         if pd.notna(val):
@@ -111,7 +111,7 @@ class GVLDataHandler:
     def _extract_skill_values(self, row: pd.Series) -> Dict[str, int]:
         """從資料列提取技能值"""
         skill_values = {}
-        for skill in self.skills:
+        for skill in sorted(self.skills):
             if skill not in row:
                 continue
             value = row[skill]
@@ -182,7 +182,7 @@ class GVLDataHandler:
         sailor_rows = menu[menu['位置'] == '航海士']
         skills = set()
         for _, row in sailor_rows.iterrows():
-            for skill in self.skills:
+            for skill in sorted(self.skills):
                 if skill not in row:
                     continue
                 if pd.notna(row[skill]):
@@ -342,7 +342,7 @@ class GVLDataHandler:
             return None
         
         config = {}
-        for position in self.positions:
+        for position in sorted(self.positions):
             equipment_list = df[df['位置'] == position]['裝備名稱'].dropna().unique()
             config[position] = [
                 self.get_equipment_by_name(name)
@@ -384,7 +384,7 @@ class GVLDataHandler:
             'skills': sorted(list(self.skills)),
             'equipment_by_position': {
                 pos: len(self.get_equipment_by_position(pos))
-                for pos in self.positions
+                for pos in sorted(self.positions)
             }
         }
 
