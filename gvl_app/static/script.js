@@ -964,7 +964,8 @@ function triggerAutoBuild() {
     const excludeQuality = document.getElementById('autoPoorMode')?.checked || false;
 
     const resultsDiv = document.getElementById('autoBuildResults');
-    resultsDiv.innerHTML = '<p>計算中…</p>';
+    resultsDiv.innerHTML =
+        '<div class="auto-build-loading"><span class="auto-build-spinner"></span>計算最佳配裝中…</div>';
     resultsDiv.style.display = 'block';
 
     fetch('/api/character/suggest-builds', {

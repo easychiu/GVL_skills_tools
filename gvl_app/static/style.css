@@ -848,6 +848,28 @@ select.slot-boarding {
     padding: 4px 8px;
 }
 
+.auto-build-loading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px;
+    color: #2d4a8a;
+    font-weight: 600;
+}
+
+.auto-build-spinner {
+    width: 18px;
+    height: 18px;
+    border: 3px solid #c5d3f7;
+    border-top-color: #2d4a8a;
+    border-radius: 50%;
+    animation: auto-build-spin 0.8s linear infinite;
+}
+
+@keyframes auto-build-spin {
+    to { transform: rotate(360deg); }
+}
+
 .auto-build-preset-row {
     display: flex;
     flex-wrap: wrap;

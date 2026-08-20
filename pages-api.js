@@ -328,6 +328,9 @@
             if (pSkills.length >= 5) break;
         }
 
+        // 沒有任何有效優先技能時無從評分，且會讓下方剪枝完全失效（等同全枚舉）
+        if (!pSkills.length) return [];
+
         // 建立各位置已排序裝備清單（可選擇排除「(質變)」裝備）
         const sortedPositions = zhSort(data.positions || []);
         const eqByPos = {};
@@ -346,74 +349,148 @@
             const count = SUGGEST_DUPLICATE_POSITIONS.has(pos) ? 2 : 1;
             for (let i = 1; i <= count; i++) {
                 const label = count > 1 ? `${pos}${i}` : pos;
-                slots.push({ label, equipment });
+                slots.push({ label, position: pos, equipment });
             }
         }
         const orderMap = new Map(SUGGEST_SLOT_ORDER.map((s, idx) => [s, idx]));
         slots.sort((a, b) => (orderMap.get(a.label) ?? 999) - (orderMap.get(b.label) ?? 999));
 
-        // 每槽保留 Top-K 候選（依 _score 降冪排序）；空位置以 null 佔位
+        // ── 柏拉圖裁剪 ────────────────────────────────────────────────────
+        // 每件裝備化為向量（各優先技能值…, 該裝備全技能總和）。若 B 的每個分量
+        // 都 >= A，任何用 A 的配裝換成 B 都不會更差，A 可安全丟棄——這一步不會
+        // 排除最佳解，卻能把搜尋空間從 10^14 級砍到數千～數百萬。
+        const vecOf = eq => {
+            const sk = eq.skills || {};
+            const v = pSkills.map(s => sk[s] || 0);
+            v.push(Object.values(sk).reduce((a, b) => a + b, 0));
+            return v;
+        };
+        const paretoFront = equipment => {
+            const pairs = equipment.map(e => [vecOf(e), e]);
+            const keys = [...new Set(pairs.map(([v]) => v.join(',')))].map(s => s.split(',').map(Number));
+            const nondom = new Set(
+                keys.filter(v => !keys.some(o => o.join(',') !== v.join(',') && o.every((a, i) => a >= v[i])))
+                    .map(v => v.join(','))
+            );
+            const seen = new Set();
+            const out = [];
+            for (const [v, e] of pairs) {
+                const key = v.join(',');
+                if (!nondom.has(key) || seen.has(key)) continue;
+                seen.add(key);
+                out.push([v, e]);
+            }
+            return out;
+        };
+
+        const emptyVec = new Array(pSkills.length + 1).fill(0);
         const slotCandidates = slots.map(slot => {
-            if (!slot.equipment.length) return [null];
-            const scored = slot.equipment
-                .slice()
-                .sort((a, b) =>
-                    compareTuples(scoreEquipmentForPriority(b, pSkills), scoreEquipmentForPriority(a, pSkills))
-                );
-            return scored.slice(0, candidatesPerSlot);
+            if (!slot.equipment.length) return [[emptyVec, null]];
+            let cand = paretoFront(slot.equipment);
+            // 同位置有兩格時，若前緣全是「(唯一)」裝備就填不滿兩格，需補上非唯一的前緣
+            if (SUGGEST_DUPLICATE_POSITIONS.has(slot.position) &&
+                cand.every(([, e]) => e.name.includes('(唯一)'))) {
+                const plain = slot.equipment.filter(e => !e.name.includes('(唯一)'));
+                if (plain.length) {
+                    const have = new Set(cand.map(([v]) => v.join(',')));
+                    cand = cand.concat(paretoFront(plain).filter(([v]) => !have.has(v.join(','))));
+                }
+            }
+            return cand;
         });
 
-        // 枚舉所有組合：過濾重複的「(唯一)」裝備，並以排序後名稱簽章去重
-        const uniqueCombos = [];
-        const seenSig = new Set();
-        for (const combo of cartesianProduct(slotCandidates)) {
-            const eqNames = combo.filter(eq => eq !== null).map(eq => eq.name);
-            // 唯一裝備只會有一件，質變版與原版視為同一件（去掉「(質變)」後比對）
-            const uniqueOnly = eqNames
-                .filter(n => n.includes('(唯一)'))
-                .map(n => n.replace('(質變)', ''));
-            if (uniqueOnly.length !== new Set(uniqueOnly).size) continue;
-            // 簽章分隔符是 NUL（非空白）：裝備名稱不可能含 NUL，串接後不會與其他組合碰撞
-            const sig = eqNames.slice().sort(zhCompare).join('\u0000');
-            if (seenSig.has(sig)) continue;
-            seenSig.add(sig);
-            uniqueCombos.push(eqNames);
+        // ── 分支定界搜尋 ──────────────────────────────────────────────────
+        const target = skillCap > 0 ? skillCap : SUGGEST_PRIORITY_TARGET;
+        const k = pSkills.length;
+        const n = slotCandidates.length;
+
+        // 非裝備部分（角色上限 + 職業加成 + 航海士）先算好，裝備只補差額
+        const profBonus = (data.professions || {})[profession] || {};
+        const capMap = (data.skill_caps || {})[profession] || (data.skill_caps || {})['通用'] || {};
+        const sailorSet = new Set(isSailor ? (data.sailor_skills || []) : []);
+        const base = pSkills.map(
+            s => (capMap[s] || 0) + (profBonus[s] || 0) + (sailorSet.has(s) ? 1 : 0)
+        );
+
+        // 從第 i 格起各技能還能拿到的最大值——用來算樂觀上界
+        const maxRemain = Array.from({ length: n + 1 }, () => new Array(k).fill(0));
+        for (let i = n - 1; i >= 0; i--) {
+            for (let j = 0; j < k; j++) {
+                maxRemain[i][j] = maxRemain[i + 1][j] +
+                    Math.max(...slotCandidates[i].map(([v]) => v[j]));
+            }
         }
 
-        // 評分基準是「最高值」（角色上限 + 加成），也就是遊戲內實際能到的技能等級；
-        // 超過遊戲上限的部分進遊戲會被砍掉，計分時一律以上限計，
-        // 因此把某技能堆過頭不會加分，優化器會自動把多的點數挪去補其他選定技能。
-        const priorityTarget = skillCap > 0 ? skillCap : SUGGEST_PRIORITY_TARGET;
-        const results = [];
-        for (const eqNames of uniqueCombos) {
-            const skillResult = calcCharacterSkills(data, profession, eqNames, isSailor);
-            const bonusSkills = skillResult.bonus_skills || {};
-            const highestSkills = skillResult.highest_skills || {};
+        // 同位置的兩格候選清單相同，強制索引遞增即可避免枚舉出重複組合
+        const sameAsPrev = slots.map((s, i) => i > 0 && s.position === slots[i - 1].position);
 
-            // 實際生效值：最高值取到上限為止（超過的部分是浪費）
-            const priorityValues = {};
-            for (const skill of pSkills) {
-                priorityValues[skill] = Math.min(highestSkills[skill] || 0, priorityTarget);
+        // 容差：一併收下略低於最佳的方案，使用者才有不同取捨可挑
+        const TOLERANCE = 2;
+        let bestTotal = -1;
+        const byProfile = new Map();
+
+        const dfs = (i, acc, chosen, start) => {
+            if (i === n) {
+                const profile = [];
+                let total = 0;
+                for (let j = 0; j < k; j++) {
+                    const v = Math.min(base[j] + acc[j], target);
+                    profile.push(v);
+                    total += v;
+                }
+                if (total > bestTotal) bestTotal = total;
+                if (total < bestTotal - TOLERANCE) return;
+                const names = chosen.filter(e => e !== null).map(e => e.name);
+                // 唯一裝備每套只能一件，質變版與原版視為同一件
+                const uniq = names.filter(x => x.includes('(唯一)')).map(x => x.replace('(質變)', ''));
+                if (uniq.length !== new Set(uniq).size) return;
+                const skillsAtCap = profile.filter(v => v >= target).length;
+                const scoreKey = [total, skillsAtCap, ...profile, acc[k]];
+                const key = profile.join(',');
+                const cur = byProfile.get(key);
+                if (!cur || compareTuples(scoreKey, cur.scoreKey) > 0) {
+                    byProfile.set(key, { scoreKey, names, total });
+                }
+                return;
             }
-            const priorityScore = pSkills.map(skill => priorityValues[skill]);
-            const effectiveTotal = priorityScore.reduce((a, b) => a + b, 0);
-            const totalBonus = Object.values(bonusSkills).reduce((a, b) => a + b, 0);
-            const skillsAtCap = pSkills.filter(skill => priorityValues[skill] >= priorityTarget).length;
+            // 樂觀上界：剩餘槽位全部拿滿也追不上目前最佳就整支剪掉
+            let upper = 0;
+            for (let j = 0; j < k; j++) {
+                upper += Math.min(base[j] + acc[j] + maxRemain[i][j], target);
+            }
+            if (upper < bestTotal - TOLERANCE) return;
+            const candidates = slotCandidates[i];
+            for (let idx = sameAsPrev[i] ? start : 0; idx < candidates.length; idx++) {
+                const [v, eq] = candidates[idx];
+                const next = new Array(k + 1);
+                for (let j = 0; j <= k; j++) next[j] = acc[j] + v[j];
+                chosen.push(eq);
+                dfs(i + 1, next, chosen, idx);
+                chosen.pop();
+            }
+        };
+        dfs(0, new Array(k + 1).fill(0), [], 0);
 
-            // 主要目標是「選定技能實際可用的總點數」。不可用頂到上限的技能數當
-            // 主鍵——那會為了把單一技能湊到 25 而犧牲更多其他選定技能的點數。
-            const scoreKey = [effectiveTotal, skillsAtCap, ...priorityScore, totalBonus];
+        // 每種「技能輪廓」只留最佳的一套，讓回傳的方案彼此真的不同
+        const cutoff = bestTotal - TOLERANCE;
+        const ordered = [...byProfile.values()]
+            .filter(x => x.total >= cutoff)
+            .sort((a, b) => compareTuples(b.scoreKey, a.scoreKey));
 
+        const results = [];
+        for (const { scoreKey, names } of ordered.slice(0, topN)) {
+            const skillResult = calcCharacterSkills(data, profession, names, isSailor);
+            const highest = skillResult.highest_skills || {};
+            const priorityValues = {};
+            for (const s of pSkills) priorityValues[s] = Math.min(highest[s] || 0, target);
             results.push({
-                equipment_names: eqNames,
+                equipment_names: names,
                 score_key: scoreKey,
                 priority_values: priorityValues,
                 skill_result: skillResult
             });
         }
-
-        results.sort((a, b) => compareTuples(b.score_key, a.score_key));
-        return results.slice(0, topN);
+        return results;
     }
 
     // ── 9 個 API 端點 ─────────────────────────────────────────────────────
@@ -552,6 +629,8 @@
             throw apiError(400, 'top_n、candidates_per_slot 必須 >= 1，skill_cap 必須 >= 0');
         }
 
+        // 搜尋是同步的，會凍住主執行緒；先讓出一拍讓瀏覽器把載入動畫畫出來
+        await new Promise(resolve => setTimeout(resolve, 0));
         const plans = suggestBuilds(data, {
             profession,
             prioritySkills,

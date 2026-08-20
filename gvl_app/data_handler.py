@@ -445,6 +445,10 @@ class GVLDataHandler:
             if len(p_skills) >= 5:
                 break
 
+        # 沒有任何有效優先技能時無從評分，且會讓下方的剪枝完全失效（等同全枚舉）
+        if not p_skills:
+            return []
+
         # 槽位配置常數（與 CharacterTab 保持一致）
         _DUPLICATE = {'飾品', '寶物'}
         _SLOT_ORDER = ['飾品1', '飾品2', '寶物1', '寶物2', '主武', '副武',
@@ -469,93 +473,132 @@ class GVLDataHandler:
         order_map = {s: idx for idx, s in enumerate(_SLOT_ORDER)}
         slots.sort(key=lambda s: order_map.get(s['label'], 999))
 
-        def _score(eq: dict) -> tuple:
-            """裝備優先技能評分 tuple：(覆蓋技能數, 選定技能總和, 單件裝備總加成)
-
-            優先選覆蓋到較多選定技能的裝備（廣度優先），
-            相同廣度時再看選定技能加成總和，最後看整體加成。
-            """
+        # ── 柏拉圖裁剪 ────────────────────────────────────────────────────
+        # 每件裝備化為向量（各優先技能值…, 該裝備全技能總和）。若 B 的每個分量
+        # 都 >= A，任何用 A 的配裝換成 B 都不會更差，A 可安全丟棄——這一步不會
+        # 排除最佳解，卻能把搜尋空間從 10^14 級砍到數千～數百萬。
+        def _vec(eq: dict) -> tuple:
             sk = eq.get('skills', {})
-            pvals = tuple(sk.get(s, 0) for s in p_skills)
-            covered = sum(1 for v in pvals if v > 0)
-            total_pval = sum(pvals)
-            return (covered, total_pval, sum(sk.values()))
+            return tuple(sk.get(s, 0) for s in p_skills) + (sum(sk.values()),)
 
-        # 每槽保留 Top-K 候選；槽位無裝備時以 None 占位
-        slot_candidates: List[List[Optional[dict]]] = []
-        for slot in slots:
-            eq_list = slot['equipment']
-            if not eq_list:
-                slot_candidates.append([None])
-                continue
-            scored = sorted(eq_list, key=_score, reverse=True)
-            slot_candidates.append(scored[:candidates_per_slot])
-
-        # 枚舉所有組合（先做唯一裝備與集合去重）
-        unique_combos: List[List[str]] = []
-        seen_combo_sig: set = set()
-        for combo in iterproduct(*slot_candidates):
-            eq_names: List[str] = []
-            for eq in combo:
-                if eq is None:
-                    continue
-                eq_names.append(eq['name'])
-            # 名稱含「(唯一)」的裝備不可重複裝備；唯一裝備只會有一件，
-            # 因此質變版與原版視為同一件（去掉「(質變)」後比對）
-            unique_names = [
-                n.replace('(質變)', '') for n in eq_names if '(唯一)' in n
-            ]
-            if len(unique_names) != len(set(unique_names)):
-                continue
-            sig = tuple(sorted(eq_names))
-            if sig in seen_combo_sig:
-                continue
-            seen_combo_sig.add(sig)
-            unique_combos.append(eq_names)
-
-        # 評分基準是「最高值」（角色上限 + 加成），也就是遊戲內實際能到的技能等級；
-        # 超過遊戲上限的部分進遊戲會被砍掉，計分時一律以上限計，
-        # 因此把某技能堆過頭不會加分，優化器會自動把多的點數挪去補其他選定技能。
-        priority_target = skill_cap if skill_cap > 0 else 25
-        results: List[Dict[str, Any]] = []
-        for eq_names in unique_combos:
-            try:
-                skill_result = self.calculate_character_skills(
-                    profession, eq_names, is_sailor=is_sailor
-                )
-            except ValueError:
-                continue
-            bonus_skills = skill_result.get('bonus_skills', {})
-            highest_skills = skill_result.get('highest_skills', {})
-
-            # 實際生效值：最高值取到上限為止（超過的部分是浪費）
-            priority_values = {
-                skill: min(highest_skills.get(skill, 0), priority_target)
-                for skill in p_skills
+        def _pareto(equipment: List[dict]) -> List[tuple]:
+            vecs = [(_vec(e), e) for e in equipment]
+            uniq = {v for v, _ in vecs}
+            nondom = {
+                v for v in uniq
+                if not any(o != v and all(a >= b for a, b in zip(o, v)) for o in uniq)
             }
-            priority_score = tuple(priority_values[skill] for skill in p_skills)
-            effective_total = sum(priority_score)
-            total_bonus = sum(bonus_skills.values())
-            # 真正頂到遊戲上限的選定技能數量
-            skills_at_cap = sum(
-                1 for skill in p_skills
-                if priority_values[skill] >= priority_target
-            )
-            # 主要目標是「選定技能實際可用的總點數」。不可用頂到上限的技能數當
-            # 主鍵——那會為了把單一技能湊到 25 而犧牲更多其他選定技能的點數。
-            score_key = (
-                effective_total,     # 主要：選定技能生效值總和（超過上限的不計）
-                skills_at_cap,       # 次要：同分時偏好真正頂到上限的方案
-                *priority_score,     # 再次：依使用者填的優先順序逐一比較
-                total_bonus,         # 最後：整體加成總和
-            )
+            seen, out = set(), []
+            for v, e in vecs:
+                if v in nondom and v not in seen:
+                    seen.add(v)
+                    out.append((v, e))
+            return out
 
+        empty = ((0,) * (len(p_skills) + 1), None)
+        slot_candidates: List[List[tuple]] = []
+        for slot in slots:
+            equipment = slot['equipment']
+            if not equipment:
+                slot_candidates.append([empty])
+                continue
+            cand = _pareto(equipment)
+            # 同位置有兩格時，若前緣全是「(唯一)」裝備就填不滿兩格，
+            # 需另外補上非唯一裝備的前緣
+            if slot['position'] in _DUPLICATE and all('(唯一)' in v[1]['name'] for v in cand):
+                plain = [e for e in equipment if '(唯一)' not in e['name']]
+                if plain:
+                    have = {v for v, _ in cand}
+                    cand = cand + [x for x in _pareto(plain) if x[0] not in have]
+            slot_candidates.append(cand)
+
+        # ── 分支定界搜尋 ──────────────────────────────────────────────────
+        target = skill_cap if skill_cap > 0 else 25
+        k = len(p_skills)
+        n = len(slot_candidates)
+
+        # 非裝備部分（角色上限 + 職業加成 + 航海士）先算好，裝備只補差額
+        prof_bonus = self.professions[profession]
+        cap_map = self.skill_caps.get(profession, self.skill_caps.get('通用', {}))
+        sailor_set = self.sailor_skills if is_sailor else set()
+        base = [
+            cap_map.get(s, 0) + prof_bonus.get(s, 0) + (1 if s in sailor_set else 0)
+            for s in p_skills
+        ]
+
+        # 從第 i 格起，各技能還能拿到的最大值——用來算樂觀上界
+        max_remain = [[0] * k for _ in range(n + 1)]
+        for i in range(n - 1, -1, -1):
+            for j in range(k):
+                max_remain[i][j] = max_remain[i + 1][j] + max(
+                    v[j] for v, _ in slot_candidates[i]
+                )
+
+        # 同位置的兩格候選清單相同，強制索引遞增即可避免枚舉出重複組合
+        same_as_prev = [
+            i > 0 and slots[i]['position'] == slots[i - 1]['position']
+            for i in range(n)
+        ]
+
+        # 容差：一併收下略低於最佳的方案，使用者才有不同取捨可挑
+        tolerance = 2
+        best_total = -1
+        by_profile: Dict[tuple, tuple] = {}
+
+        def _dfs(i: int, acc: List[int], chosen: List[Optional[dict]], start: int):
+            nonlocal best_total
+            if i == n:
+                profile = tuple(min(base[j] + acc[j], target) for j in range(k))
+                total = sum(profile)
+                if total > best_total:
+                    best_total = total
+                if total < best_total - tolerance:
+                    return
+                names = [e['name'] for e in chosen if e is not None]
+                # 唯一裝備每套只能一件，質變版與原版視為同一件
+                uniq = [x.replace('(質變)', '') for x in names if '(唯一)' in x]
+                if len(uniq) != len(set(uniq)):
+                    return
+                skills_at_cap = sum(1 for v in profile if v >= target)
+                score_key = (total, skills_at_cap, *profile, acc[k])
+                cur = by_profile.get(profile)
+                if cur is None or score_key > cur[0]:
+                    by_profile[profile] = (score_key, names)
+                return
+            # 樂觀上界：剩餘槽位全部拿滿也追不上目前最佳就整支剪掉
+            upper = sum(
+                min(base[j] + acc[j] + max_remain[i][j], target) for j in range(k)
+            )
+            if upper < best_total - tolerance:
+                return
+            begin = start if same_as_prev[i] else 0
+            candidates = slot_candidates[i]
+            for idx in range(begin, len(candidates)):
+                v, eq = candidates[idx]
+                _dfs(i + 1, [acc[j] + v[j] for j in range(k + 1)], chosen + [eq], idx)
+
+        _dfs(0, [0] * (k + 1), [], 0)
+
+        # 每種「技能輪廓」只留最佳的一套，讓回傳的方案彼此真的不同
+        cutoff = best_total - tolerance
+        ordered = sorted(
+            (x for prof_key, x in by_profile.items() if sum(prof_key) >= cutoff),
+            key=lambda x: x[0],
+            reverse=True,
+        )
+
+        results: List[Dict[str, Any]] = []
+        for score_key, names in ordered[:top_n]:
+            skill_result = self.calculate_character_skills(
+                profession, names, is_sailor=is_sailor
+            )
+            highest = skill_result.get('highest_skills', {})
             results.append({
-                'equipment_names': eq_names,
+                'equipment_names': names,
                 'score_key': score_key,
-                'priority_values': priority_values,
+                'priority_values': {
+                    s: min(highest.get(s, 0), target) for s in p_skills
+                },
                 'skill_result': skill_result,
             })
-
-        results.sort(key=lambda item: item['score_key'], reverse=True)
-        return results[:top_n]
+        return results
