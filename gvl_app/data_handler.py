@@ -400,18 +400,20 @@ class GVLDataHandler:
     ) -> List[Dict[str, Any]]:
         """根據優先技能搜尋最佳 Top-N 配裝方案。
 
-        算法：每個槽位保留 candidates_per_slot 件高分候選，枚舉所有組合後
-        依優先技能順序評分（最多 5 個）。評分看的是「最高值」（角色上限 + 加成），
-        即遊戲內實際能到的等級，且以 skill_cap 為天花板截斷——堆過頭不加分，
-        所以會優先把選定技能一個個頂到上限，再用總生效值與整體加成排序，
-        去重後回傳前 top_n 套。
+        算法：先柏拉圖裁剪（丟掉在所有優先技能與全技能總和上都被壓制的裝備），
+        再對倖存者做分支定界枚舉（以剩餘槽位的樂觀上界剪枝）。兩道裁剪都不會
+        排除最佳解，因此結果等同窮舉——全空間有 3.24e14 組，無法直接枚舉。
+
+        評分看的是「最高值」（角色上限 + 加成），即遊戲內實際能到的等級，
+        並以 skill_cap 為天花板截斷——堆過頭不加分，多餘點數會被挪去補其他
+        選定技能。回傳時每種「技能輪廓」只留最佳一套，讓方案彼此真的不同。
 
         Args:
             profession: 職業名稱
             priority_skills: 優先技能清單（最多 5 個，可含空字串）
             is_sailor: 是否套用航海士 +1
             top_n: 回傳方案數量
-            candidates_per_slot: 每個槽位保留的候選裝備數（影響計算速度與品質）
+            candidates_per_slot: 已無作用，僅為相容舊呼叫端保留
             skill_cap: 遊戲內技能上限，也是配裝要頂到的目標值（預設 25）
             exclude_quality: 若為 True，排除名稱含「(質變)」的裝備
 
@@ -427,8 +429,6 @@ class GVLDataHandler:
         Raises:
             ValueError: 職業名稱不存在時拋出
         """
-        from itertools import product as iterproduct
-
         if profession not in self.professions:
             raise ValueError(f'不支持的職業: {profession}')
 

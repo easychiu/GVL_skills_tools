@@ -273,42 +273,6 @@
     const SUGGEST_PRIORITY_TARGET = 25;
 
     /**
-     * 裝備優先技能評分：[覆蓋的優先技能數, 優先技能加成總和, 該裝備所有技能加成總和]。
-     * @param {Object} eq 裝備物件
-     * @param {string[]} pSkills 優先技能清單
-     * @returns {number[]}
-     */
-    function scoreEquipmentForPriority(eq, pSkills) {
-        const sk = eq.skills || {};
-        const pvals = pSkills.map(s => sk[s] || 0);
-        const covered = pvals.filter(v => v > 0).length;
-        const totalPval = pvals.reduce((a, b) => a + b, 0);
-        const totalAll = Object.values(sk).reduce((a, b) => a + b, 0);
-        return [covered, totalPval, totalAll];
-    }
-
-    /**
-     * 產生笛卡兒積，枚舉順序與 Python itertools.product 相同（最後一軸變動最快）。
-     * @param {Array[]} lists
-     */
-    function* cartesianProduct(lists) {
-        const lens = lists.map(l => l.length);
-        if (lens.some(l => l === 0)) return;
-        const idx = new Array(lists.length).fill(0);
-        while (true) {
-            yield idx.map((v, i) => lists[i][v]);
-            let pos = lists.length - 1;
-            while (pos >= 0) {
-                idx[pos] += 1;
-                if (idx[pos] < lens[pos]) break;
-                idx[pos] = 0;
-                pos -= 1;
-            }
-            if (pos < 0) break;
-        }
-    }
-
-    /**
      * 根據優先技能搜尋最佳 Top-N 配裝方案（邏輯移植自 suggest_builds，細節見 data_handler.py）。
      * @param {Object} data data.json 內容
      * @param {Object} opts
