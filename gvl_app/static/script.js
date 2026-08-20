@@ -91,6 +91,67 @@ function escapeHtml(value) {
         .replace(/'/g, '&#039;');
 }
 
+// ── 版本與更新日誌 ────────────────────────────────────────────────────────
+// 每次上線改動請在 CHANGELOG 最前面新增一筆，並把 APP_VERSION 更新為當天日期。
+// DATA_VERSION 是裝備資料對應的遊戲改版，資料同步後才需要改。
+const APP_VERSION = 'v2026.08.20';
+const DATA_VERSION = '資料：2026-07-06 印度改版';
+
+const CHANGELOG = [
+    {
+        date: '2026-08-20',
+        version: 'v2026.08.20',
+        items: [
+            '網頁版上線：免安裝、手機可直接用',
+            '自動配裝改用可證明最佳解的搜尋，同時提供「順序最高」與「綜合最高」兩種方案',
+            '自動配裝以遊戲內最高值（角色上限＋裝備＋航海士）為目標，不再把技能堆過 25 浪費',
+            '新增一鍵套用：砲術裝備／冒險陸戰／海事白兵',
+            '優先技能下拉改為砲術類／冒險類／白兵類分組',
+            '手機版排版大改：可用寬度增加三成、配裝結果改卡片式、觸控目標放大',
+            '裝備分頁新增依部位篩選',
+            '角色配裝改為開啟時的預設頁',
+            '溫庫隆庫魯雕像、托特的護符標記為唯一裝備（質變版與原版視為同一件）',
+            '修正各職業技能上限未正確載入——先前所有職業都誤用大提督／打撈者的上限',
+            '修正砲術系配色的技能名稱與資料不符（炮術／水平射擊／彈道學）',
+            '修正三件質變裝備在 Excel 下拉選單中選不到'
+        ]
+    },
+    {
+        date: '2026-07-31',
+        version: '',
+        items: ['同步巴哈姆特整理帖裝備資料至 2026-07-06 印度改版']
+    },
+    {
+        date: '2026-04-24',
+        version: '',
+        items: ['新增質變裝備資料', '技能分解總覽移至頁面下方']
+    }
+];
+
+/**
+ * 渲染標題列的版本標籤與更新日誌分頁
+ */
+function renderVersionAndChangelog() {
+    const appEl = document.getElementById('appVersion');
+    const dataEl = document.getElementById('dataVersion');
+    if (appEl) appEl.textContent = APP_VERSION;
+    if (dataEl) dataEl.textContent = DATA_VERSION;
+
+    const list = document.getElementById('changelogList');
+    if (!list) return;
+    list.innerHTML = CHANGELOG.map(entry => `
+        <div class="changelog-entry">
+            <div class="changelog-date">
+                ${escapeHtml(entry.date)}
+                ${entry.version ? `<span class="changelog-version">${escapeHtml(entry.version)}</span>` : ''}
+            </div>
+            <ul class="changelog-items">
+                ${entry.items.map(t => `<li>${escapeHtml(t)}</li>`).join('')}
+            </ul>
+        </div>
+    `).join('');
+}
+
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
     initializePage();
@@ -106,6 +167,7 @@ function initializePage() {
     setupTabHandlers();
     setupAutoBuilderListeners();
     setupEquipmentFilter();
+    renderVersionAndChangelog();
 }
 
 // 設置裝備頁的位置篩選
