@@ -401,9 +401,10 @@ class GVLDataHandler:
         """根據優先技能搜尋最佳 Top-N 配裝方案。
 
         算法：每個槽位保留 candidates_per_slot 件高分候選，枚舉所有組合後
-        依優先技能順序評分（最多 5 個），優先技能以「覆蓋更多選定技能（廣度
-        優先）→ 接近 25（深度）」為排序原則，同分時再比較優先技能總值與整體
-        加成總和，去重後回傳前 top_n 套。
+        依優先技能順序評分（最多 5 個）。評分看的是「最高值」（角色上限 + 加成），
+        即遊戲內實際能到的等級，且以 skill_cap 為天花板截斷——堆過頭不加分，
+        所以會優先把選定技能一個個頂到上限，再用總生效值與整體加成排序，
+        去重後回傳前 top_n 套。
 
         Args:
             profession: 職業名稱
@@ -411,16 +412,16 @@ class GVLDataHandler:
             is_sailor: 是否套用航海士 +1
             top_n: 回傳方案數量
             candidates_per_slot: 每個槽位保留的候選裝備數（影響計算速度與品質）
-            skill_cap: 單一技能加成上限（超過此值的方案將被過濾，預設 25）
+            skill_cap: 遊戲內技能上限，也是配裝要頂到的目標值（預設 25）
             exclude_quality: 若為 True，排除名稱含「(質變)」的裝備
 
         Returns:
             方案列表，每筆包含：
               - equipment_names: 裝備名稱清單
               - score_key: 排序用分數 tuple
-                (skills_at_cap, priority_closeness_total,
-                 p1..pN_closeness_to_25, priority_raw_total, total_bonus)
-              - priority_values: {技能名: 合計值} 字典
+                (skills_at_cap, effective_total,
+                 p1..pN 生效值, priority_raw_total, total_bonus)
+              - priority_values: {技能名: 生效最高值（已截到 skill_cap）} 字典
               - skill_result: 完整技能計算結果（同 calculate_character_skills 輸出）
 
         Raises:
@@ -512,8 +513,10 @@ class GVLDataHandler:
             seen_combo_sig.add(sig)
             unique_combos.append(eq_names)
 
-        # 依最終結果評分：優先技能越接近 25 越前，同分看總值與總加成
-        priority_target = 25
+        # 評分基準是「最高值」（角色上限 + 加成），也就是遊戲內實際能到的技能等級；
+        # 超過遊戲上限的部分進遊戲會被砍掉，計分時一律以上限計，
+        # 因此把某技能堆過頭不會加分，優化器會自動把多的點數挪去補其他選定技能。
+        priority_target = skill_cap if skill_cap > 0 else 25
         results: List[Dict[str, Any]] = []
         for eq_names in unique_combos:
             try:
@@ -522,33 +525,29 @@ class GVLDataHandler:
                 )
             except ValueError:
                 continue
-            # 過濾：任一技能加成超過上限的方案
-            if skill_cap > 0 and any(
-                v > skill_cap for v in skill_result.get('bonus_skills', {}).values()
-            ):
-                continue
             bonus_skills = skill_result.get('bonus_skills', {})
-            priority_values = {skill: bonus_skills.get(skill, 0) for skill in p_skills}
+            highest_skills = skill_result.get('highest_skills', {})
 
-            # 各優先技能以 25 為理想值：越接近 25 分數越高
-            priority_score = tuple(
-                priority_target - abs(priority_values.get(skill, 0) - priority_target)
+            # 實際生效值：最高值取到上限為止（超過的部分是浪費）
+            priority_values = {
+                skill: min(highest_skills.get(skill, 0), priority_target)
                 for skill in p_skills
-            )
-            priority_closeness_total = sum(priority_score)
-            priority_raw_total = sum(priority_values.values())
+            }
+            priority_score = tuple(priority_values[skill] for skill in p_skills)
+            effective_total = sum(priority_score)
             total_bonus = sum(bonus_skills.values())
-            # 已達到上限（25）的選定技能數量，越多越優先
+            # 真正頂到遊戲上限的選定技能數量
             skills_at_cap = sum(
                 1 for skill in p_skills
-                if priority_values.get(skill, 0) >= priority_target
+                if priority_values[skill] >= priority_target
             )
+            # 主要目標是「選定技能實際可用的總點數」。不可用頂到上限的技能數當
+            # 主鍵——那會為了把單一技能湊到 25 而犧牲更多其他選定技能的點數。
             score_key = (
-                skills_at_cap,            # 主要：達到上限的技能數
-                priority_closeness_total, # 次要：所有選定技能接近上限的總分（等權）
-                *priority_score,          # 再次：各技能個別接近分（保留輸入優先順序）
-                priority_raw_total,
-                total_bonus,
+                effective_total,     # 主要：選定技能生效值總和（超過上限的不計）
+                skills_at_cap,       # 次要：同分時偏好真正頂到上限的方案
+                *priority_score,     # 再次：依使用者填的優先順序逐一比較
+                total_bonus,         # 最後：整體加成總和
             )
 
             results.append({

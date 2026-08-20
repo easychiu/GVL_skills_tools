@@ -380,27 +380,29 @@
             uniqueCombos.push(eqNames);
         }
 
-        // 逐組合計算技能、依 skill_cap 過濾，再依 score_key 評分
+        // 評分基準是「最高值」（角色上限 + 加成），也就是遊戲內實際能到的技能等級；
+        // 超過遊戲上限的部分進遊戲會被砍掉，計分時一律以上限計，
+        // 因此把某技能堆過頭不會加分，優化器會自動把多的點數挪去補其他選定技能。
+        const priorityTarget = skillCap > 0 ? skillCap : SUGGEST_PRIORITY_TARGET;
         const results = [];
         for (const eqNames of uniqueCombos) {
             const skillResult = calcCharacterSkills(data, profession, eqNames, isSailor);
             const bonusSkills = skillResult.bonus_skills || {};
-            if (skillCap > 0 && Object.values(bonusSkills).some(v => v > skillCap)) continue;
+            const highestSkills = skillResult.highest_skills || {};
 
+            // 實際生效值：最高值取到上限為止（超過的部分是浪費）
             const priorityValues = {};
-            for (const skill of pSkills) priorityValues[skill] = bonusSkills[skill] || 0;
-
-            const priorityScore = pSkills.map(
-                skill => SUGGEST_PRIORITY_TARGET - Math.abs((priorityValues[skill] || 0) - SUGGEST_PRIORITY_TARGET)
-            );
-            const priorityClosenessTotal = priorityScore.reduce((a, b) => a + b, 0);
-            const priorityRawTotal = Object.values(priorityValues).reduce((a, b) => a + b, 0);
+            for (const skill of pSkills) {
+                priorityValues[skill] = Math.min(highestSkills[skill] || 0, priorityTarget);
+            }
+            const priorityScore = pSkills.map(skill => priorityValues[skill]);
+            const effectiveTotal = priorityScore.reduce((a, b) => a + b, 0);
             const totalBonus = Object.values(bonusSkills).reduce((a, b) => a + b, 0);
-            const skillsAtCap = pSkills.filter(
-                skill => (priorityValues[skill] || 0) >= SUGGEST_PRIORITY_TARGET
-            ).length;
+            const skillsAtCap = pSkills.filter(skill => priorityValues[skill] >= priorityTarget).length;
 
-            const scoreKey = [skillsAtCap, priorityClosenessTotal, ...priorityScore, priorityRawTotal, totalBonus];
+            // 主要目標是「選定技能實際可用的總點數」。不可用頂到上限的技能數當
+            // 主鍵——那會為了把單一技能湊到 25 而犧牲更多其他選定技能的點數。
+            const scoreKey = [effectiveTotal, skillsAtCap, ...priorityScore, totalBonus];
 
             results.push({
                 equipment_names: eqNames,

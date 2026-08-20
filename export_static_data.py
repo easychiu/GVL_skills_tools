@@ -39,7 +39,9 @@ data = {
 
 data_json_path = ROOT / 'data.json'
 with open(data_json_path, 'w', encoding='utf-8') as f:
-    json.dump(data, f, ensure_ascii=False, indent=2)
+    # sort_keys 讓輸出穩定：技能來自 set，每次執行的迭代順序都不同，
+    # 不排序的話即使資料沒變，每次匯出都會產生數百行無意義的 git diff
+    json.dump(data, f, ensure_ascii=False, indent=2, sort_keys=True)
 
 # ---- 2. 匯出 index.html ----
 html = (APP_DIR / 'templates' / 'index.html').read_text(encoding='utf-8')

@@ -1001,7 +1001,10 @@ function displayAutoBuildResults(plans, prioritySkills) {
         return;
     }
 
-    const skillCols = prioritySkills.map(s => `<th>${escapeHtml(s)}</th>`).join('');
+    // 數值是「最高值」（角色上限＋加成），超過遊戲上限的部分不列入，需標示清楚
+    const skillCols = prioritySkills
+        .map(s => `<th title="最高值：角色上限＋加成，超過上限以上限計">${escapeHtml(s)}</th>`)
+        .join('');
     const rows = plans.map((plan, i) => {
         const skillVals = prioritySkills
             .map(s => `<td>${escapeHtml(String(plan.priority_values[s] || 0))}</td>`)
