@@ -911,7 +911,6 @@ function applySkillPreset(presetName) {
     AUTO_PRIORITY_IDS.forEach((id, index) => {
         const select = document.getElementById(id);
         if (!select) return;
-        select.disabled = false;
         select.value = members[index] || '';
     });
     refreshAutoBuildSkillOptions();
