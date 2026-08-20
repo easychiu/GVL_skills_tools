@@ -1,0 +1,176 @@
+<!-- 此檔由 export_static_data.py 自動產生，請勿手動修改 -->
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GVL 裝備表</title>
+    <link rel="stylesheet" href="gvl_app/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 標題 -->
+        <div class="header">
+            <h1>⚔️ GVL 裝備表系統</h1>
+            <p class="subtitle">大航海時代遊戲裝備配置工具</p>
+        </div>
+
+        <!-- 導航標籤 -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="search">搜索</button>
+            <button class="tab-btn" data-tab="equipment">裝備</button>
+            <button class="tab-btn" data-tab="character">角色</button>
+            <button class="tab-btn" data-tab="config">配置</button>
+            <button class="tab-btn" data-tab="stats">統計</button>
+        </div>
+
+        <!-- 搜索頁面 -->
+        <div id="search" class="tab-content active">
+            <h2>搜索裝備</h2>
+            
+            <div class="search-section">
+                <h3>按名稱搜索</h3>
+                <div class="search-form">
+                    <input type="text" id="searchName" placeholder="輸入裝備名稱..." class="search-input">
+                    <button onclick="searchByName()" class="btn btn-primary">搜索</button>
+                </div>
+            </div>
+
+            <div class="search-section">
+                <h3>按技能搜索</h3>
+                <div class="search-form">
+                    <select id="skillSelect" class="search-input">
+                        <option value="">選擇技能...</option>
+                    </select>
+                    <input type="number" id="minLevel" placeholder="最小等級" value="1" class="search-input" min="1">
+                    <button onclick="searchBySkill()" class="btn btn-primary">搜索</button>
+                </div>
+            </div>
+
+            <div class="search-section">
+                <h3>按位置搜索</h3>
+                <div class="search-form">
+                    <select id="positionSelect" class="search-input">
+                        <option value="">選擇位置...</option>
+                    </select>
+                    <button onclick="searchByPosition()" class="btn btn-primary">搜索</button>
+                </div>
+            </div>
+
+            <div id="searchResults" class="results-container" style="display: none;">
+                <h3>搜索結果</h3>
+                <div id="resultsList"></div>
+            </div>
+        </div>
+
+        <!-- 裝備頁面 -->
+        <div id="equipment" class="tab-content">
+            <h2>所有裝備</h2>
+            <div class="info-bar">
+                <span id="equipmentCount">加載中...</span>
+            </div>
+            <div id="equipmentList" class="equipment-grid"></div>
+            <div class="pagination-controls">
+                <button onclick="previousPage()" class="btn">‹ 上一頁</button>
+                <span id="pageInfo"></span>
+                <button onclick="nextPage()" class="btn">下一頁 ›</button>
+            </div>
+        </div>
+
+        <!-- 角色頁面 -->
+        <div id="character" class="tab-content">
+            <h2>角色配裝</h2>
+
+            <!-- 自動配裝面板 -->
+            <div class="auto-build-panel">
+                <div class="auto-build-header">⚡ 自動配裝</div>
+                <div class="auto-build-controls">
+                    <div class="auto-build-skills-row">
+                        <span class="auto-build-label">優先技能：</span>
+                        <select id="autoPriority1" class="search-input auto-skill-select"><option value="">（不選）</option></select>
+                        <select id="autoPriority2" class="search-input auto-skill-select"><option value="">（不選）</option></select>
+                        <select id="autoPriority3" class="search-input auto-skill-select"><option value="">（不選）</option></select>
+                        <select id="autoPriority4" class="search-input auto-skill-select"><option value="">（不選）</option></select>
+                        <select id="autoPriority5" class="search-input auto-skill-select"><option value="">（不選）</option></select>
+                    </div>
+                    <div class="auto-build-options-row">
+                        <label class="auto-build-label">技能上限：</label>
+                        <input type="number" id="autoSkillCap" value="25" min="1" max="99" class="auto-skill-cap-input">
+                        <label class="auto-build-poor-label">
+                            <input type="checkbox" id="autoPoorMode"> 我窮（排除質變裝備）
+                        </label>
+                        <button id="autoTriggerBtn" class="btn btn-primary">🔧 自動配裝</button>
+                    </div>
+                </div>
+                <div id="autoBuildResults" class="auto-build-results" style="display:none;"></div>
+            </div>
+
+            <div class="character-main-layout">
+                <div class="character-stage-card">
+                    <div class="character-controls">
+                        <div class="character-control-item">
+                            <label class="character-control-label" for="professionSelect">職業</label>
+                            <select id="professionSelect" class="search-input">
+                                <option value="通用">通用</option>
+                            </select>
+                        </div>
+                        <div class="character-control-item">
+                            <label class="character-control-label">
+                                <input type="checkbox" id="sailorCheckbox">
+                                航海士（選單航海士技能 +1）
+                            </label>
+                            <div id="sailorSkillsHint" class="character-hint"></div>
+                        </div>
+                    </div>
+
+                    <div id="characterEquipmentForm" class="character-stage-inner">
+                        <div id="characterLeftSlots" class="character-slot-column character-slot-column-left"></div>
+                        <div class="character-avatar-panel">
+                            <div class="slot-color-legend">
+                                <span class="legend-item legend-cannon">■ 藍色：砲術系（砲術／水平／彈道／貫穿／速射）</span>
+                                <span class="legend-item legend-boarding">■ 綠色：白兵(跳幫)系（突擊／戰術／射擊）</span>
+                            </div>
+                            <div class="character-avatar-figure">
+                                <div class="character-avatar-title">角色</div>
+                                <div class="character-avatar-subtitle">依照參考圖配置左右裝備欄位</div>
+                            </div>
+                        </div>
+                        <div id="characterRightSlots" class="character-slot-column character-slot-column-right"></div>
+                    </div>
+
+                    <button onclick="calculateCharacterSkills()" class="btn btn-primary character-calc-btn">計算角色技能</button>
+                </div>
+
+                <div class="character-results-card">
+                    <h3>角色技能結果</h3>
+                    <div id="characterResults" class="results-container character-results-panel" style="display: none;">
+                        <div id="characterResultsContent"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 技能分解總覽（固定在最下方，避免側欄空間不足） -->
+            <div id="skillBreakdownSection" class="character-skills-block character-skills-block-bottom" style="display:none;"></div>
+        </div>
+
+        <!-- 配置頁面 -->
+        <div id="config" class="tab-content">
+            <h2>預設配置</h2>
+            <div class="config-buttons">
+                <button onclick="loadConfig('選單')" class="btn btn-secondary">查看：選單</button>
+                <button onclick="loadConfig('炮船範例')" class="btn btn-secondary">查看：炮船範例</button>
+            </div>
+            <div id="configContent" class="config-content" style="display: none;"></div>
+        </div>
+
+        <!-- 統計頁面 -->
+        <div id="stats" class="tab-content">
+            <h2>數據統計</h2>
+            <div id="statsContent" class="stats-content"></div>
+        </div>
+    </div>
+
+    <script src="pages-api.js"></script>
+    <script src="gvl_app/static/script.js"></script>
+</body>
+</html>
