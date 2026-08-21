@@ -119,6 +119,7 @@ const CHANGELOG = [
             '網頁版上線：免安裝、手機可直接用',
             '一鍵套用會連職業一起帶入：砲術裝備→大提督／打撈者，冒險陸戰與海事白兵→大海盜／藥劑師／遊俠',
             '航海士預設打勾',
+            '優先技能改為選到重複時自動互換，不再把已選技能停用——先前想調換優先順序時會點不到',
             '自動配裝改用可證明最佳解的搜尋，同時提供「順序最高」與「綜合最高」兩種方案',
             '自動配裝以遊戲內最高值（角色上限＋裝備＋航海士）為目標，不再把技能堆過 25 浪費',
             '新增一鍵套用：砲術裝備／冒險陸戰／海事白兵',
@@ -963,7 +964,8 @@ function renderAutoBuildSkillDropdowns(skills) {
             });
             select.appendChild(group);
         });
-        select.addEventListener('change', refreshAutoBuildSkillOptions);
+        select.dataset.prev = select.value;
+        select.addEventListener('change', handleAutoPriorityChange);
     });
 }
 
@@ -1011,23 +1013,37 @@ function applySkillPreset(presetName) {
 }
 
 /**
- * 重新整理各優先技能下拉選單的可用選項，防止重複選擇
+ * 記住各優先技能欄位目前的值，供下次變更時判斷該把舊值換到哪一格
  */
 function refreshAutoBuildSkillOptions() {
-    const selectedValues = AUTO_PRIORITY_IDS.map(id => {
-        const el = document.getElementById(id);
-        return el ? el.value : '';
-    }).filter(v => v);
-
     AUTO_PRIORITY_IDS.forEach(id => {
         const select = document.getElementById(id);
-        if (!select) return;
-        const currentVal = select.value;
-        const othersSelected = selectedValues.filter(v => v !== currentVal);
-        Array.from(select.options).forEach(opt => {
-            opt.disabled = opt.value ? othersSelected.includes(opt.value) : false;
-        });
+        if (select) select.dataset.prev = select.value;
     });
+}
+
+/**
+ * 優先技能變更：選到已在別格的技能時兩格互換，而不是禁止選取。
+ * 先前的做法是把已選技能在其他格停用，導致想調換優先順序時根本點不到。
+ * @param {Event} event change 事件
+ */
+function handleAutoPriorityChange(event) {
+    const select = event.target;
+    const prev = select.dataset.prev || '';
+    const value = select.value;
+
+    if (value) {
+        AUTO_PRIORITY_IDS.forEach(id => {
+            if (id === select.id) return;
+            const other = document.getElementById(id);
+            // 同一個技能只能出現一次：把它讓出來的格子填回本格的舊值
+            if (other && other.value === value) {
+                other.value = prev;
+                other.dataset.prev = prev;
+            }
+        });
+    }
+    select.dataset.prev = value;
 }
 
 /**
